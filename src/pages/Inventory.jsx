@@ -1,93 +1,129 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { products as api, categories as catApi } from '../api/client'
-import { inr, inrK, titleCase } from '../lib/format'
 import { useToast } from '../context/ToastContext'
-import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
-import { IconBox, IconAlert, IconBoxX, IconRupee, IconRefresh, IconSearch } from '../components/icons'
+import { inr } from '../lib/format'
+import {
+  IconBox, IconAlert, IconBoxX, IconRupee, IconRefresh, IconSearch, IconPlus,
+} from '../components/icons'
 
-const LOW = 5
-const PAGE = 8
+const PAGE_SIZE = 8
+const LOW_THRESHOLD = 2
+const RESTOCK_STEP = 10
+
+const STATUS_FILTERS = [
+  { key: 'any',    label: 'Any stock' },
+  { key: 'active', label: 'Active' },
+  { key: 'low',    label: 'Low' },
+  { key: 'out',    label: 'Out of stock' },
+]
+
+function levelFor(stock) {
+  if (!stock || stock === 0) return { bucket: 'out', color: 'red', pct: 0 }
+  if (stock <= LOW_THRESHOLD) return { bucket: 'low', color: 'amber', pct: 25 }
+  if (stock <= 10) return { bucket: 'active', color: 'blue', pct: 60 }
+  return { bucket: 'active', color: 'green', pct: 100 }
+}
+
+const STATUS_PILL = {
+  out:    { label: 'Out',    color: '#fb7185', border: 'rgba(251, 113, 133, 0.35)', bg: 'rgba(251, 113, 133, 0.12)' },
+  low:    { label: 'Low',    color: '#f59e0b', border: 'rgba(245, 158, 11, 0.35)',  bg: 'rgba(245, 158, 11, 0.12)' },
+  active: { label: 'Active', color: '#4ade80', border: 'rgba(74, 222, 128, 0.35)',  bg: 'rgba(74, 222, 128, 0.12)' },
+}
 
 export default function Inventory() {
   const toast = useToast()
   const [rows, setRows] = useState(null)
   const [cats, setCats] = useState([])
-  const [restockRow, setRestockRow] = useState(null)
-  const [qty, setQty] = useState('10')
-  const [saving, setSaving] = useState(false)
-  // Row-level +N quick action — holds { product, amount } while the
-  // confirmation dialog is open, cleared on confirm or cancel.
-  const [quickConfirm, setQuickConfirm] = useState(null)
-  const [page, setPage] = useState(1)
   const [q, setQ] = useState('')
   const [catFilter, setCatFilter] = useState('all')
-  // Stock status filter — mirrors the badges in the table ('all' | 'active'
-  // | 'low' | 'out') so the chip row doubles as a quick way to drill into
-  // whatever needs attention first.
-  const [stockFilter, setStockFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('any')
+  const [page, setPage] = useState(1)
+  const [busyId, setBusyId] = useState(null)
+  const [confirmBulk, setConfirmBulk] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const load = () => api.list().then(setRows).catch((e) => toast.bad(e.message))
   useEffect(() => {
     load()
     catApi.list().then(setCats).catch(() => {})
   }, [])
-  // Reset to page 1 whenever any filter changes so the user isn't stranded
-  // on an empty page after narrowing the result set.
-  useEffect(() => { setPage(1) }, [q, catFilter, stockFilter])
+  useEffect(() => { setPage(1) }, [q, catFilter, statusFilter])
+
+  const catName = (id) => cats.find((c) => c.id === id)?.name || id
+
+  const stats = useMemo(() => {
+    if (!rows) return { units: 0, low: 0, out: 0, value: 0 }
+    let units = 0, low = 0, out = 0, value = 0
+    rows.forEach((p) => {
+      const s = Number(p.stock) || 0
+      units += s
+      if (s === 0) out += 1
+      else if (s <= LOW_THRESHOLD) low += 1
+      value += s * (Number(p.price) || 0)
+    })
+    return { units, low, out, value }
+  }, [rows])
 
   const filtered = useMemo(() => {
     if (!rows) return []
     const needle = q.trim().toLowerCase()
     return rows.filter((p) => {
       if (catFilter !== 'all' && p.category !== catFilter) return false
-      if (stockFilter === 'active' && !(p.stock > LOW)) return false
-      if (stockFilter === 'low' && !(p.stock > 0 && p.stock <= LOW)) return false
-      if (stockFilter === 'out' && p.stock !== 0) return false
+      const bucket = levelFor(p.stock).bucket
+      if (statusFilter !== 'any' && bucket !== statusFilter) return false
       if (needle) {
-        const hay = `${p.name} ${p.id} ${p.weave || ''} ${p.color || ''}`.toLowerCase()
+        const hay = `${p.name} ${p.reference || p.id} ${p.materials || ''} ${catName(p.category)}`.toLowerCase()
         if (!hay.includes(needle)) return false
       }
       return true
     })
-  }, [rows, q, catFilter, stockFilter])
+  }, [rows, q, catFilter, statusFilter, cats])
 
-  const paged = filtered.slice((page - 1) * PAGE, page * PAGE)
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const stats = useMemo(() => {
-    if (!rows) return null
-    return {
-      units: rows.reduce((a, p) => a + (p.stock || 0), 0),
-      low: rows.filter((p) => p.stock > 0 && p.stock <= LOW).length,
-      out: rows.filter((p) => p.stock === 0).length,
-      value: rows.reduce((a, p) => a + (p.price || 0) * (p.stock || 0), 0),
-      max: Math.max(...rows.map((p) => p.stock || 0), 1),
-    }
-  }, [rows])
-
-  async function quickRestock(p, amount) {
-    setSaving(true)
-    try { await api.restock(p.id, amount); toast.ok(`+${amount} added to ${p.name}`); load() }
-    catch (e) { toast.bad(e.message) } finally { setSaving(false); setQuickConfirm(null) }
-  }
-
-  async function doRestock(e) {
-    e.preventDefault()
-    setSaving(true)
+  async function restockOne(p, by = RESTOCK_STEP) {
+    setBusyId(p.id)
     try {
-      await api.restock(restockRow.id, Number(qty) || 0)
-      toast.ok('Stock updated')
-      setRestockRow(null); load()
-    } catch (e) { toast.bad(e.message) } finally { setSaving(false) }
+      const next = (Number(p.stock) || 0) + by
+      await api.update(p.id, { stock: next })
+      toast.ok(`${p.name}: +${by} units (now ${next})`)
+      load()
+    } catch (e) {
+      toast.bad(e.message)
+    } finally {
+      setBusyId(null)
+    }
   }
 
-  const cards = stats ? [
-    { label: 'Total Units', value: stats.units, Icon: IconBox, cls: 'c-cus' },
-    { label: 'Low Stock', value: stats.low, Icon: IconAlert, cls: 'c-ord' },
-    { label: 'Out of Stock', value: stats.out, Icon: IconBoxX, cls: 'c-rev' },
-    { label: 'Stock Value', value: inr(stats.value), Icon: IconRupee, cls: 'c-stk' },
-  ] : []
+  async function restockAllLow() {
+    if (!rows) return
+    const targets = rows.filter((p) => (Number(p.stock) || 0) <= LOW_THRESHOLD)
+    if (!targets.length) {
+      setConfirmBulk(false)
+      toast.ok('Nothing to restock — no low or out-of-stock pieces.')
+      return
+    }
+    setBulkSaving(true)
+    try {
+      for (const p of targets) {
+        const next = (Number(p.stock) || 0) + RESTOCK_STEP
+        // eslint-disable-next-line no-await-in-loop
+        await api.update(p.id, { stock: next })
+      }
+      toast.ok(`Restocked ${targets.length} piece${targets.length === 1 ? '' : 's'} by +${RESTOCK_STEP}`)
+      setConfirmBulk(false)
+      load()
+    } catch (e) {
+      toast.bad(e.message)
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  const chips = [{ id: 'all', name: 'All' }, ...cats]
+  const totalProducts = rows ? rows.length : 0
 
   return (
     <>
@@ -97,160 +133,195 @@ export default function Inventory() {
           <p>Monitor stock levels and restock alerts</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={() => { setRestockRow(rows?.[0]); setQty('10') }} disabled={!rows?.length}>
-            <IconRefresh size={17} /> Restock
+          <button className="btn btn-primary" onClick={() => setConfirmBulk(true)}>
+            <IconRefresh size={16} /> Restock all low
           </button>
         </div>
       </div>
 
-      {stats && (
-        <div className="stat-grid">
-          {cards.map((c) => (
-            <div className={`stat inv-stat ${c.cls}`} key={c.label}>
-              <div className="st-ico"><c.Icon size={20} /></div>
-              <div className="st-label">{c.label}</div>
-              <div className="st-value">{c.value}</div>
-            </div>
-          ))}
+      <div className="stat-grid">
+        <div className="stat stat-dark inv-stat">
+          <div className="st-ico" style={{ color: '#4ade80' }}><IconBox size={20} /></div>
+          <div className="st-value">{stats.units.toLocaleString('en-IN')}</div>
+          <div className="st-label">Total units</div>
         </div>
-      )}
-
-      {rows && (
-        <div className="card filter-bar">
-          <div className="search-box grow">
-            <IconSearch size={18} />
-            <input
-              placeholder="Search by name, SKU, weave or colour…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
-          <div className="chips">
-            <button
-              className={`chip ${catFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setCatFilter('all')}
-            >
-              All
-            </button>
-            {cats.map((c) => (
-              <button
-                key={c.id}
-                className={`chip ${catFilter === c.id ? 'active' : ''}`}
-                onClick={() => setCatFilter(c.id)}
-              >
-                {c.name}
-              </button>
-            ))}
-          </div>
-          <div className="chips">
-            {[
-              { id: 'all', label: 'Any stock' },
-              { id: 'active', label: 'Active' },
-              { id: 'low', label: 'Low' },
-              { id: 'out', label: 'Out of stock' },
-            ].map((s) => (
-              <button
-                key={s.id}
-                className={`chip ${stockFilter === s.id ? 'active' : ''}`}
-                onClick={() => setStockFilter(s.id)}
-              >
-                {s.label}
-              </button>
-            ))}
-          </div>
+        <div className="stat stat-dark inv-stat">
+          <div className="st-ico" style={{ color: '#f59e0b' }}><IconAlert size={20} /></div>
+          <div className="st-value">{stats.low}</div>
+          <div className="st-label">Low stock pieces</div>
         </div>
-      )}
-
-      <div className="card">
-        <div className="card-head">
-          <h3>Stock Levels</h3>
-          {rows && (
-            <span className="muted" style={{ fontSize: 12 }}>
-              {filtered.length === rows.length
-                ? `${rows.length} product${rows.length === 1 ? '' : 's'}`
-                : `${filtered.length} of ${rows.length} matching`}
-            </span>
-          )}
+        <div className="stat stat-dark inv-stat">
+          <div className="st-ico" style={{ color: '#fb7185' }}><IconBoxX size={20} /></div>
+          <div className="st-value">{stats.out}</div>
+          <div className="st-label">Out of stock</div>
         </div>
-        {!rows ? <div className="spinner" /> : filtered.length === 0 ? (
-          <div className="empty"><div className="em-ico">🥻</div><p>No sarees match these filters</p></div>
-        ) : (
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr><th>SKU</th><th>Saree</th><th>Category</th><th className="num">Stock</th><th>Level</th><th>Status</th><th></th></tr>
-              </thead>
-              <tbody>
-                {paged.map((p) => {
-                  const pct = Math.min(Math.round(((p.stock || 0) / stats.max) * 100), 100)
-                  const level = p.stock === 0 ? 'red' : p.stock <= LOW ? 'amber' : p.stock <= 15 ? 'blue' : 'green'
-                  return (
-                    <tr key={p.id}>
-                      <td className="mono-sku">{p.id}</td>
-                      <td style={{ fontWeight: 600, color: 'var(--ink-900)' }}>{p.name}</td>
-                      <td>{titleCase(p.category)}</td>
-                      <td className="num" style={{ fontWeight: 700 }}>{p.stock}</td>
-                      <td>
-                        <div className="level-bar"><span className={level} style={{ width: `${Math.max(pct, 4)}%` }} /></div>
-                      </td>
-                      <td>
-                        {p.stock === 0
-                          ? <span className="badge red">Out of stock</span>
-                          : p.stock <= LOW
-                            ? <span className="badge amber">Low</span>
-                            : <span className="badge green">Active</span>}
-                      </td>
-                      <td className="num">
-                        <button className="restock-link" onClick={() => setQuickConfirm({ product: p, amount: 10 })}>+10</button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <div className="table-pager"><Pagination page={page} pageSize={PAGE} total={filtered.length} onChange={setPage} /></div>
-          </div>
-        )}
+        <div className="stat stat-dark inv-stat">
+          <div className="st-ico" style={{ color: '#dfc06d' }}><IconRupee size={20} /></div>
+          <div className="st-value">{inr(stats.value)}</div>
+          <div className="st-label">Stock value</div>
+        </div>
       </div>
 
-      {quickConfirm && (
-        <ConfirmDialog
-          title="Add stock"
-          message={`Are you sure you want to add ${quickConfirm.amount} units to the stock of "${quickConfirm.product.name}"?`}
-          confirmLabel={saving ? 'Adding…' : `Yes, add ${quickConfirm.amount}`}
-          cancelLabel="No, cancel"
-          tone="primary"
-          onConfirm={() => quickRestock(quickConfirm.product, quickConfirm.amount)}
-          onClose={() => setQuickConfirm(null)}
-          busy={saving}
-        />
+      <div className="card filter-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 14 }}>
+        <div className="search-box grow">
+          <IconSearch size={18} />
+          <input
+            placeholder="Search by name, SKU or category…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        <div className="chips">
+          {chips.map((c) => (
+            <button
+              key={c.id}
+              className={`chip ${catFilter === c.id ? 'active' : ''}`}
+              onClick={() => setCatFilter(c.id)}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+        <div className="chips">
+          {STATUS_FILTERS.map((s) => (
+            <button
+              key={s.key}
+              className={`chip ${statusFilter === s.key ? 'active' : ''}`}
+              onClick={() => setStatusFilter(s.key)}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!rows ? (
+        <div className="spinner" />
+      ) : (
+        <div className="card card-pad">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14 }}>
+            <h3 style={{ fontSize: 15.5, fontWeight: 600, color: 'var(--glass-text)' }}>Stock Levels</h3>
+            <span style={{ fontSize: 12.5, color: 'var(--glass-text-muted)', letterSpacing: 0.3 }}>
+              {filtered.length} of {totalProducts} piece{totalProducts === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {filtered.length === 0 ? (
+            <div className="empty"><div className="em-ico">📦</div><p>No pieces match these filters</p></div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '110px 1fr 140px 60px 140px 100px 72px',
+                  gap: 14, alignItems: 'center',
+                  padding: '10px 2px',
+                  fontSize: 10.5, fontWeight: 600, letterSpacing: 0.6, textTransform: 'uppercase',
+                  color: 'var(--glass-text-muted)',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                }}>
+                  <div>SKU</div>
+                  <div>Piece</div>
+                  <div>Category</div>
+                  <div style={{ textAlign: 'right' }}>Stock</div>
+                  <div>Level</div>
+                  <div>Status</div>
+                  <div style={{ textAlign: 'right' }}>Restock</div>
+                </div>
+
+                {paged.map((p) => {
+                  const level = levelFor(p.stock)
+                  const pill = STATUS_PILL[level.bucket]
+                  return (
+                    <div key={p.id} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '110px 1fr 140px 60px 140px 100px 72px',
+                      gap: 14, alignItems: 'center',
+                      padding: '14px 2px',
+                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    }}>
+                      <div className="mono-sku" style={{ color: 'var(--glass-text-soft)' }}>
+                        {p.reference || p.id}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--glass-text)', textTransform: 'uppercase', letterSpacing: 0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {p.name}
+                        </div>
+                        {p.materials && (
+                          <div style={{ fontSize: 11.5, color: 'var(--glass-text-muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {p.materials}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: 'var(--glass-text-soft)' }}>
+                        {catName(p.category)}
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: 15, fontWeight: 700, color: 'var(--glass-text)', fontVariantNumeric: 'tabular-nums' }}>
+                        {p.stock ?? 0}
+                      </div>
+                      <div>
+                        <div className="level-bar" style={{ width: '100%', background: 'rgba(255,255,255,0.08)' }}>
+                          <span className={level.color} style={{ width: `${level.pct}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          border: `1px solid ${pill.border}`,
+                          background: pill.bg,
+                          color: pill.color,
+                          padding: '3px 10px 3px 8px',
+                          borderRadius: 999,
+                          fontSize: 10.5, fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase',
+                        }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+                          {pill.label}
+                        </span>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          disabled={busyId === p.id}
+                          onClick={() => restockOne(p)}
+                          title={`Add ${RESTOCK_STEP} units`}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            border: '1px solid rgba(255,255,255,0.25)',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: 'var(--glass-text)',
+                            padding: '5px 10px', borderRadius: 8,
+                            fontSize: 12, fontWeight: 600, letterSpacing: 0.3,
+                            cursor: busyId === p.id ? 'default' : 'pointer',
+                            opacity: busyId === p.id ? 0.5 : 1,
+                          }}
+                        >
+                          <IconPlus size={13} /> {RESTOCK_STEP}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ marginTop: 16 }}>
+                <Pagination page={page} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} />
+              </div>
+            </>
+          )}
+        </div>
       )}
 
-      {restockRow && (
-        <Modal
-          title="Restock"
-          subtitle={restockRow.name}
-          onClose={() => setRestockRow(null)}
-          footer={
-            <>
-              <button className="btn btn-outline" onClick={() => setRestockRow(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={doRestock} disabled={saving}>{saving ? 'Adding…' : 'Add stock'}</button>
-            </>
-          }
-        >
-          <form onSubmit={doRestock}>
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Saree</label>
-              <select value={restockRow.id} onChange={(e) => setRestockRow(rows.find((r) => r.id === e.target.value))}>
-                {rows.map((r) => <option key={r.id} value={r.id}>{r.name} — {r.stock} in stock</option>)}
-              </select>
-            </div>
-            <div className="field full">
-              <label>Quantity to add</label>
-              <input type="number" value={qty} onChange={(e) => setQty(e.target.value)} autoFocus />
-            </div>
-          </form>
-        </Modal>
+      {confirmBulk && (
+        <ConfirmDialog
+          title="Restock all low & out-of-stock pieces"
+          message={`Add +${RESTOCK_STEP} units to every piece currently at or below ${LOW_THRESHOLD} in stock. Continue?`}
+          confirmLabel={bulkSaving ? 'Restocking…' : 'Yes, restock'}
+          cancelLabel="Cancel"
+          tone="primary"
+          onConfirm={restockAllLow}
+          onClose={() => setConfirmBulk(false)}
+          busy={bulkSaving}
+        />
       )}
     </>
   )

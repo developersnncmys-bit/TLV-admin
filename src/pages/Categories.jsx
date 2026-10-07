@@ -17,7 +17,14 @@ const COLORS = [
 ]
 const CYCLE = ['rose', 'gold', 'maroon', 'ink', 'rose', 'gold']
 const gradOf = (c, i) => COLORS.find((x) => x.key === c.color)?.grad || COLORS.find((x) => x.key === CYCLE[i % CYCLE.length]).grad
-const EMPTY = { name: '', color: 'rose', image: '', region: '', order: '', active: true }
+const EMPTY = {
+  name: '', color: 'rose',
+  image: '', heroImage: '',
+  region: '', tagline: '', heroEyebrow: '',
+  collectionNote: '', promoBody: '', promoImage: '',
+  promoCtaLabel: '', promoCtaHref: '',
+  order: '', active: true,
+}
 
 export default function Categories() {
   const toast = useToast()
@@ -36,9 +43,9 @@ export default function Categories() {
     prodApi.list().then((ps) => {
       const s = {}
       ps.forEach((p) => {
-        s[p.category] = s[p.category] || { products: 0, sold: 0 }
+        s[p.category] = s[p.category] || { products: 0, stock: 0 }
         s[p.category].products += 1
-        s[p.category].sold += p.sold || 0
+        s[p.category].stock += p.stock || 0
       })
       setStats(s)
     }).catch(() => {})
@@ -50,7 +57,15 @@ export default function Categories() {
       name: c.name,
       color: c.color || 'rose',
       image: c.image || '',
+      heroImage: c.heroImage || '',
       region: c.region || '',
+      tagline: c.tagline || '',
+      heroEyebrow: c.heroEyebrow || '',
+      collectionNote: c.collectionNote || '',
+      promoBody: c.promoBody || '',
+      promoImage: c.promoImage || '',
+      promoCtaLabel: c.promoCtaLabel || '',
+      promoCtaHref: c.promoCtaHref || '',
       order: c.order != null ? String(c.order) : '',
       active: c.active !== false,
     })
@@ -73,6 +88,20 @@ export default function Categories() {
     }
   }
 
+  const onSingleImageField = (field) => async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const url = await uploadImage(file)
+      setForm((f) => ({ ...f, [field]: url }))
+      toast.ok('Image added')
+    } catch (err) {
+      toast.bad(err.message || 'Upload failed')
+    } finally {
+      e.target.value = ''
+    }
+  }
+
   async function save(e) {
     e.preventDefault()
     if (!form.name.trim()) return toast.bad('Category name is required')
@@ -82,7 +111,15 @@ export default function Categories() {
         name: form.name,
         color: form.color,
         image: form.image,
+        heroImage: form.heroImage,
         region: form.region.trim(),
+        tagline: form.tagline.trim(),
+        heroEyebrow: form.heroEyebrow.trim(),
+        collectionNote: form.collectionNote.trim(),
+        promoBody: form.promoBody.trim(),
+        promoImage: form.promoImage,
+        promoCtaLabel: form.promoCtaLabel.trim(),
+        promoCtaHref: form.promoCtaHref.trim(),
         order: Number(form.order) || 0,
         active: !!form.active,
       }
@@ -110,7 +147,7 @@ export default function Categories() {
       <div className="page-head">
         <div>
           <h1>Categories</h1>
-          <p>Organise your saree collection</p>
+          <p>Sculptures · Vases · Tabletop · Lighting</p>
         </div>
         <div className="page-actions">
           <button className="btn btn-primary" onClick={openNew}><IconPlus size={18} /> New Category</button>
@@ -123,7 +160,7 @@ export default function Categories() {
         <>
           <div className="prod-grid">
           {rows.slice((page - 1) * PAGE, page * PAGE).map((c, i) => {
-            const st = stats[c.id] || stats[c.name?.toLowerCase()] || { products: 0, sold: 0 }
+            const st = stats[c.id] || stats[c.name?.toLowerCase()] || { products: 0, stock: 0 }
             return (
               <div className="cat-card" key={c.id}>
                 <div
@@ -146,34 +183,40 @@ export default function Categories() {
                     </div>
                   </div>
                   {c.region && (
-                    <div style={{ fontSize: 12, color: '#616373', marginTop: 4 }}>{c.region}</div>
+                    <div style={{ fontSize: 12, color: 'var(--glass-text-muted)', marginTop: 4 }}>{c.region}</div>
                   )}
                   <div className="cat-stats">
                     <div>
                       <div className="cat-num">{st.products}</div>
-                      <div className="cat-lbl">Products</div>
+                      <div className="cat-lbl">Pieces</div>
                     </div>
                     <div>
-                      <div className="cat-num maroon">{st.sold}</div>
-                      <div className="cat-lbl">Units sold</div>
+                      <div className="cat-num maroon">{st.stock}</div>
+                      <div className="cat-lbl">In stock</div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 11, color: '#8a8b96' }}>
-                    <span>Order: {c.order || 0}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--glass-text-muted)' }}>
+                    <span>Order {c.order || 0}</span>
                     <button
                       type="button"
                       onClick={() => toggleActive(c)}
                       style={{
-                        border: 'none',
-                        background: c.active === false ? '#f4e5e7' : '#e8f5ec',
-                        color: c.active === false ? '#75001F' : '#2f7f4a',
-                        padding: '2px 10px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        border: `1px solid ${c.active === false ? 'rgba(251, 113, 133, 0.35)' : 'rgba(74, 222, 128, 0.35)'}`,
+                        background: c.active === false ? 'rgba(251, 113, 133, 0.12)' : 'rgba(74, 222, 128, 0.12)',
+                        color: c.active === false ? '#fb7185' : '#4ade80',
+                        padding: '3px 10px 3px 8px',
                         borderRadius: 999,
-                        fontSize: 11,
+                        fontSize: 10.5,
                         fontWeight: 600,
+                        letterSpacing: 0.4,
+                        textTransform: 'uppercase',
                         cursor: 'pointer',
                       }}
                     >
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
                       {c.active === false ? 'Inactive' : 'Active'}
                     </button>
                   </div>
@@ -189,7 +232,7 @@ export default function Categories() {
       {editing && (
         <Modal
           title={editing.id ? 'Edit Category' : 'New Category'}
-          subtitle={editing.id ? editing.id : 'Group your sarees into a collection'}
+          subtitle={editing.id ? editing.id : 'Group pieces into a collection'}
           onClose={() => setEditing(null)}
           footer={
             <>
@@ -204,7 +247,7 @@ export default function Categories() {
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Kanjivaram"
+                placeholder="e.g. Sculptures"
                 disabled={!!editing.id}
                 autoFocus
               />
@@ -239,7 +282,7 @@ export default function Categories() {
                   Remove image
                 </button>
               )}
-              <span className="img-hint">Shown on the storefront "Shop by weave" rail. Square crops (1:1) work best. Banner overrides still take priority.</span>
+              <span className="img-hint">Shown on the storefront category rail. Square crops (1:1) work best. Banner overrides still take priority.</span>
             </div>
 
             <div className="field full" style={{ marginBottom: 14 }}>
@@ -247,9 +290,103 @@ export default function Categories() {
               <input
                 value={form.region}
                 onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
-                placeholder="e.g. Kanchipuram"
+                placeholder="e.g. Hand-blown · Jaipur studio"
               />
-              <span className="img-hint">Shown as the subtitle under the weave name on the tile.</span>
+              <span className="img-hint">Shown as the subtitle under the category name on the storefront tile.</span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Tagline</label>
+              <textarea
+                value={form.tagline}
+                onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))}
+                placeholder="e.g. Hand-carved and cast forms — the piece a room turns toward first."
+                rows={2}
+              />
+              <span className="img-hint">Italic caption under this category's rail on The Collection page.</span>
+            </div>
+
+            <h4 className="form-section" style={{ marginTop: 10 }}>Category page hero</h4>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Hero image (landscape)</label>
+              {isImageSrc(form.heroImage) && (
+                <div style={{ marginBottom: 8 }}>
+                  <img src={form.heroImage} alt="" style={{ maxWidth: 260, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }} />
+                </div>
+              )}
+              <input type="file" accept="image/*" onChange={onSingleImageField('heroImage')} />
+              {form.heroImage && (
+                <button type="button" className="btn btn-outline" style={{ marginTop: 6, fontSize: 12 }}
+                  onClick={() => setForm((f) => ({ ...f, heroImage: '' }))}>Remove image</button>
+              )}
+              <span className="img-hint">Full-bleed banner on the category page. Landscape (~16:9) works best.</span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Hero eyebrow</label>
+              <input
+                value={form.heroEyebrow}
+                onChange={(e) => setForm((f) => ({ ...f, heroEyebrow: e.target.value }))}
+                placeholder="e.g. The Collection · Objects"
+              />
+              <span className="img-hint">Small label above the category headline. Leave blank for default.</span>
+            </div>
+
+            <h4 className="form-section" style={{ marginTop: 10 }}>Product detail — collection block</h4>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Collection accordion note</label>
+              <textarea
+                value={form.collectionNote}
+                onChange={(e) => setForm((f) => ({ ...f, collectionNote: e.target.value }))}
+                rows={2}
+                placeholder="Short blurb shown in the THE COLLECTION accordion on each piece's detail page."
+              />
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Collection promo image</label>
+              {isImageSrc(form.promoImage) && (
+                <div style={{ marginBottom: 8 }}>
+                  <img src={form.promoImage} alt="" style={{ maxWidth: 220, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }} />
+                </div>
+              )}
+              <input type="file" accept="image/*" onChange={onSingleImageField('promoImage')} />
+              {form.promoImage && (
+                <button type="button" className="btn btn-outline" style={{ marginTop: 6, fontSize: 12 }}
+                  onClick={() => setForm((f) => ({ ...f, promoImage: '' }))}>Remove image</button>
+              )}
+              <span className="img-hint">Image shown next to the "THE COLLECTION" promo band on each piece's detail page.</span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Collection promo body</label>
+              <textarea
+                value={form.promoBody}
+                onChange={(e) => setForm((f) => ({ ...f, promoBody: e.target.value }))}
+                rows={3}
+                placeholder="Body copy for the collection promo band."
+              />
+            </div>
+
+            <div className="form-grid" style={{ marginBottom: 14 }}>
+              <div className="field">
+                <label>Promo CTA label</label>
+                <input
+                  value={form.promoCtaLabel}
+                  onChange={(e) => setForm((f) => ({ ...f, promoCtaLabel: e.target.value }))}
+                  placeholder="Discover the collection"
+                />
+              </div>
+              <div className="field">
+                <label>Promo CTA link</label>
+                <input
+                  value={form.promoCtaHref}
+                  onChange={(e) => setForm((f) => ({ ...f, promoCtaHref: e.target.value }))}
+                  placeholder="/collections/sculptures"
+                />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
@@ -272,7 +409,7 @@ export default function Categories() {
                   <option value="1">Active</option>
                   <option value="0">Inactive</option>
                 </select>
-                <span className="img-hint">Inactive weaves are hidden on the storefront.</span>
+                <span className="img-hint">Inactive categories are hidden on the storefront.</span>
               </div>
             </div>
 

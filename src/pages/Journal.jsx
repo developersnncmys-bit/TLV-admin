@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { stories as api } from '../api/client'
+import { journal as api } from '../api/client'
 import { uploadImage, isImageSrc } from '../lib/image'
 import { useToast } from '../context/ToastContext'
 import Modal from '../components/Modal'
@@ -9,24 +9,21 @@ import { IconPlus, IconPencil, IconTrash } from '../components/icons'
 
 const PAGE = 6
 
-// Blank form scaffold. `look_for` is a fixed-length array (3 items)
-// because that's what the storefront tile expects — keeping it fixed
-// avoids null/undefined checks on the render side.
+const CATEGORIES = ['Guide', 'Studio', 'Interior', 'Craft', 'Object', 'Conversation']
+
 const EMPTY = {
   id: '',
   name: '',
+  category: 'Guide',
   region: '',
-  state: '',
-  era: '',
-  image: '',
-  origins: '',
-  technique: '',
-  look_for: ['', '', ''],
+  author: 'The Luxe Version',
+  hero: '',
   pull_quote: '',
+  body: '',
   order: 0,
 }
 
-export default function Stories() {
+export default function Journal() {
   const toast = useToast()
   const [rows, setRows] = useState(null)
   const [editing, setEditing] = useState(null)
@@ -39,37 +36,31 @@ export default function Stories() {
   const load = () => api.list().then(setRows).catch((e) => toast.bad(e.message))
   useEffect(() => { load() }, [])
 
-  function openNew() {
-    setForm(EMPTY)
-    setEditing({})
-  }
+  function openNew() { setForm(EMPTY); setEditing({}) }
 
   function openEdit(s) {
     setForm({
       id: s.id || '',
       name: s.name || '',
+      category: s.category || 'Guide',
       region: s.region || '',
-      state: s.state || '',
-      era: s.era || '',
-      image: s.image || '',
-      origins: s.origins || '',
-      technique: s.technique || '',
-      look_for: [s.look_for?.[0] || '', s.look_for?.[1] || '', s.look_for?.[2] || ''],
+      author: s.author || 'The Luxe Version',
+      hero: s.hero || '',
       pull_quote: s.pull_quote || '',
+      body: s.body || '',
       order: Number(s.order) || 0,
     })
     setEditing(s)
   }
 
-  // Upload one image and store its Cloudinary URL on the form.
   async function onFile(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
     try {
       const url = await uploadImage(file)
-      setForm((f) => ({ ...f, image: url }))
-      toast.ok('Image uploaded')
+      setForm((f) => ({ ...f, hero: url }))
+      toast.ok('Image added')
     } catch (err) {
       toast.bad(err.message || 'Upload failed')
     } finally {
@@ -78,38 +69,28 @@ export default function Stories() {
     }
   }
 
-  function setLookFor(i, value) {
-    setForm((f) => {
-      const look_for = [...f.look_for]
-      look_for[i] = value
-      return { ...f, look_for }
-    })
-  }
-
   async function save(e) {
     e.preventDefault()
-    if (!form.name.trim()) return toast.bad('Story name is required')
+    if (!form.name.trim()) return toast.bad('Entry title is required')
 
     setSaving(true)
     try {
       const payload = {
         name: form.name.trim(),
+        category: form.category,
         region: form.region.trim(),
-        state: form.state.trim(),
-        era: form.era.trim(),
-        image: form.image,
-        origins: form.origins.trim(),
-        technique: form.technique.trim(),
-        look_for: form.look_for.map((l) => l.trim()).filter(Boolean),
+        author: form.author.trim(),
+        hero: form.hero,
         pull_quote: form.pull_quote.trim(),
+        body: form.body.trim(),
         order: Number(form.order) || 0,
       }
       if (editing.id) {
         await api.update(editing.id, payload)
-        toast.ok('Story updated')
+        toast.ok('Journal entry updated')
       } else {
         await api.create({ ...payload, id: form.id.trim() || undefined })
-        toast.ok('Story added')
+        toast.ok('Journal entry added')
       }
       setEditing(null)
       load()
@@ -124,7 +105,7 @@ export default function Stories() {
     setSaving(true)
     try {
       await api.remove(confirm.id)
-      toast.ok('Story deleted')
+      toast.ok('Journal entry deleted')
       setConfirm(null)
       load()
     } catch (e) {
@@ -138,16 +119,16 @@ export default function Stories() {
     <>
       <div className="page-head">
         <div>
-          <h1>Stories</h1>
-          <p>Heritage narrative — one story per weave shown on the intro scroll</p>
+          <h1>The Studio — Journal</h1>
+          <p>Essays, guides and portraits — quiet notes on the pieces</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={openNew}><IconPlus size={18} /> New Story</button>
+          <button className="btn btn-primary" onClick={openNew}><IconPlus size={18} /> New Entry</button>
         </div>
       </div>
 
       {!rows ? <div className="spinner" /> : rows.length === 0 ? (
-        <div className="card"><div className="empty"><div className="em-ico">📖</div><p>No stories yet</p></div></div>
+        <div className="card"><div className="empty"><div className="em-ico">📖</div><p>No journal entries yet</p></div></div>
       ) : (
         <>
           <div className="prod-grid">
@@ -156,12 +137,12 @@ export default function Stories() {
                 <div
                   className="cat-banner"
                   style={{
-                    background: isImageSrc(s.image)
-                      ? `url(${s.image}) center/cover`
-                      : 'linear-gradient(135deg,#c12a55,#6e1936)',
+                    background: isImageSrc(s.hero)
+                      ? `url(${s.hero}) center/cover`
+                      : 'linear-gradient(135deg,#616373,#36363e)',
                   }}
                 >
-                  {!isImageSrc(s.image) && <span style={{ color: '#fff', fontSize: 40 }}>📖</span>}
+                  {!isImageSrc(s.hero) && <span style={{ color: '#fff', fontSize: 40 }}>📖</span>}
                 </div>
                 <div className="cat-body">
                   <div className="cat-head">
@@ -171,16 +152,16 @@ export default function Stories() {
                       <button className="icon-btn danger" title="Delete" onClick={() => setConfirm(s)}><IconTrash size={15} /></button>
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#616373', marginTop: 4 }}>
-                    {s.region}{s.state ? ` · ${s.state}` : ''}
+                  <div style={{ fontSize: 12, color: 'var(--glass-text-muted)', marginTop: 4 }}>
+                    {s.category}{s.region ? ` · ${s.region}` : ''}
                   </div>
-                  {s.origins && (
-                    <div style={{ fontSize: 12, color: '#36363e', marginTop: 8, lineHeight: 1.4 }}>
-                      {s.origins.length > 120 ? s.origins.slice(0, 120) + '…' : s.origins}
+                  {s.pull_quote && (
+                    <div style={{ fontSize: 12, color: 'var(--glass-text-soft)', marginTop: 8, lineHeight: 1.4, fontStyle: 'italic' }}>
+                      "{s.pull_quote.length > 110 ? s.pull_quote.slice(0, 110) + '…' : s.pull_quote}"
                     </div>
                   )}
-                  <div style={{ fontSize: 11, color: '#8a8b96', marginTop: 8 }}>
-                    Order: {s.order || 0}
+                  <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.5, textTransform: 'uppercase', color: 'var(--glass-text-muted)' }}>
+                    Order {s.order || 0}
                   </div>
                 </div>
               </div>
@@ -192,8 +173,8 @@ export default function Stories() {
 
       {editing && (
         <Modal
-          title={editing.id ? 'Edit Story' : 'New Story'}
-          subtitle={editing.id ? editing.id : 'Tell the story of a weave'}
+          title={editing.id ? 'Edit Journal Entry' : 'New Journal Entry'}
+          subtitle={editing.id ? editing.id : 'Add an essay, guide or studio note'}
           onClose={() => setEditing(null)}
           footer={
             <>
@@ -205,66 +186,65 @@ export default function Stories() {
           }
         >
           <form onSubmit={save}>
-            {/* Identity */}
             <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Weave name *</label>
+              <label>Title *</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Kanjeevaram"
+                placeholder="e.g. At the Ceramic Studio"
                 autoFocus
               />
             </div>
 
             {!editing.id && (
               <div className="field full" style={{ marginBottom: 14 }}>
-                <label>Story id (optional)</label>
+                <label>Slug (optional)</label>
                 <input
                   value={form.id}
                   onChange={(e) => setForm((f) => ({ ...f, id: e.target.value }))}
-                  placeholder="Auto-derived from name if left blank"
+                  placeholder="Auto-derived from title if left blank"
                 />
-                <span className="img-hint">Used in URLs / analytics. Cannot be changed after creation.</span>
+                <span className="img-hint">Used in URLs. Cannot be changed after creation.</span>
               </div>
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>
               <div className="field">
-                <label>Region</label>
-                <input
-                  value={form.region}
-                  onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
-                  placeholder="Kanchipuram"
-                />
+                <label>Category</label>
+                <select
+                  value={form.category}
+                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                >
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
               <div className="field">
-                <label>State</label>
+                <label>Author</label>
                 <input
-                  value={form.state}
-                  onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-                  placeholder="Tamil Nadu"
+                  value={form.author}
+                  onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
+                  placeholder="The Luxe Version"
                 />
               </div>
             </div>
 
             <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Era</label>
+              <label>Region / location</label>
               <input
-                value={form.era}
-                onChange={(e) => setForm((f) => ({ ...f, era: e.target.value }))}
-                placeholder="since the Chola dynasty · 9th century"
+                value={form.region}
+                onChange={(e) => setForm((f) => ({ ...f, region: e.target.value }))}
+                placeholder="e.g. Jaipur"
               />
             </div>
 
-            {/* Image */}
             <div className="field full" style={{ marginBottom: 14 }}>
               <label>Hero image</label>
-              {isImageSrc(form.image) && (
+              {isImageSrc(form.hero) && (
                 <div style={{ marginBottom: 8 }}>
                   <img
-                    src={form.image}
+                    src={form.hero}
                     alt=""
-                    style={{ maxWidth: 180, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }}
+                    style={{ maxWidth: 220, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }}
                   />
                 </div>
               )}
@@ -274,60 +254,35 @@ export default function Stories() {
                 onChange={onFile}
                 disabled={uploading}
               />
-              {uploading && <span className="img-hint">Uploading…</span>}
-              {form.image && (
+              {uploading && <span className="img-hint">Processing…</span>}
+              {form.hero && (
                 <button
                   type="button"
                   className="btn btn-outline"
                   style={{ marginTop: 6, fontSize: 12 }}
-                  onClick={() => setForm((f) => ({ ...f, image: '' }))}
+                  onClick={() => setForm((f) => ({ ...f, hero: '' }))}
                 >
                   Remove image
                 </button>
               )}
             </div>
 
-            {/* Editorial copy */}
             <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Origins (paragraph)</label>
-              <textarea
-                value={form.origins}
-                onChange={(e) => setForm((f) => ({ ...f, origins: e.target.value }))}
-                placeholder="Historical background — who, when, where, patronage."
-                rows={4}
-              />
-            </div>
-
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Technique (paragraph)</label>
-              <textarea
-                value={form.technique}
-                onChange={(e) => setForm((f) => ({ ...f, technique: e.target.value }))}
-                placeholder="The distinguishing craft process."
-                rows={4}
-              />
-            </div>
-
-            {/* Look for — three bullets */}
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Look for (three authentication bullets)</label>
-              {[0, 1, 2].map((i) => (
-                <input
-                  key={i}
-                  value={form.look_for[i]}
-                  onChange={(e) => setLookFor(i, e.target.value)}
-                  placeholder={`Bullet ${i + 1}`}
-                  style={{ marginBottom: 6 }}
-                />
-              ))}
-            </div>
-
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Pull quote (one memorable line)</label>
+              <label>Pull quote</label>
               <input
                 value={form.pull_quote}
                 onChange={(e) => setForm((f) => ({ ...f, pull_quote: e.target.value }))}
-                placeholder="Three sarees, fused at the petni, lived as one."
+                placeholder="One memorable line pulled from the piece."
+              />
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Body</label>
+              <textarea
+                value={form.body}
+                onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+                placeholder="Full essay or guide. Markdown is fine."
+                rows={8}
               />
             </div>
 
@@ -339,7 +294,7 @@ export default function Stories() {
                 onChange={(e) => setForm((f) => ({ ...f, order: e.target.value }))}
                 placeholder="0"
               />
-              <span className="img-hint">Lower numbers appear first in the intro scroll.</span>
+              <span className="img-hint">Lower numbers appear first on The Studio page.</span>
             </div>
           </form>
         </Modal>
@@ -347,8 +302,8 @@ export default function Stories() {
 
       {confirm && (
         <ConfirmDialog
-          title="Delete story"
-          message={`Delete "${confirm.name}"? This removes it from the storefront intro scroll.`}
+          title="Delete entry"
+          message={`Delete "${confirm.name}"? This removes it from The Studio.`}
           onConfirm={doDelete}
           onClose={() => setConfirm(null)}
           busy={saving}

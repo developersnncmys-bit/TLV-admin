@@ -1,59 +1,53 @@
-# 🧵 Thridhavarnam — Saree CRM Admin Panel
+# The Luxe Version — Studio Admin
 
-React + Vite admin dashboard for the Thridhavarnam saree boutique. It is the
-front end for the Express + MongoDB API in [`../sareeebackend`](../sareeebackend).
+React + Vite admin for [the-luxeversion.vercel.app](https://the-luxeversion.vercel.app/).
+Fully standalone — all data lives in your browser's `localStorage`. No backend,
+no API keys, no network calls.
 
-## 🚀 Getting started
+## Getting started
 
 ```bash
-# 1. Start the backend first (in ../sareeebackend)
-cd ../sareeebackend && npm install && npm run dev   # → http://localhost:5000
-
-# 2. Then the frontend
-cd ../frontend
 npm install
 npm run dev        # → http://localhost:5173
 ```
 
-The Vite dev server proxies `/api` to `http://localhost:5000`, so no CORS
-setup is needed locally.
-
-### Demo login
+### Login
 
 | Email | Password |
 | --- | --- |
-| `riya@vastrasarees.in` | `password` |
+| `admin@theluxeversion.com` | `Luxe@2026` |
 
-## ⚙️ Environment
+Credentials are defined in [`src/lib/store.js`](src/lib/store.js) — edit them there
+if you want to change them.
 
-Copy `.env.example` → `.env` only if you need to point at a non-default API:
+## Pages
 
-| Key | Description |
-| --- | --- |
-| `VITE_API_URL` | API base URL. Defaults to `/api` (proxied in dev). Set to your deployed backend origin + `/api` for production builds. |
+- **Dashboard** — catalogue value, pieces in stock, journal + enquiry counts
+- **Pieces** — product CRUD with Luxe schema (reference #, dimensions, materials, edit tag, bespoke flag)
+- **Categories** — Sculptures / Vases / Tabletop / Lighting
+- **The Edit** — curated tags (Statement / New / Limited / Designer)
+- **Journal** — essays, guides, studio notes
+- **Banners** — home hero, category tiles, feature banners
+- **Enquiry** — bespoke, appointment, interior consultation enquiries
+- **Settings** — studio info, profile, reset local data
 
-## 🧭 Features
+## Data
 
-- **Dashboard** — revenue, orders, customers, product KPIs, trend + category breakdown, recent orders, top sellers
-- **Products** — catalogue CRUD, restock, category & status filters
-- **Orders** — create/edit/delete, inline status change, auto-mirrored to Payments
-- **Customers** — CRUD with segments (New / Loyal / VIP) and lifetime value
-- **Payments** — ledger, record payment, mark paid, refund
-- **Categories** — collections with accent colours and product counts
-- **Reset demo data** — from the ⚙️ menu in the top bar
+Every resource is backed by `localStorage` under the `luxe:` prefix. First boot
+seeds the admin from [`src/data/seed.js`](src/data/seed.js). You can wipe and
+reseed from **Settings → Data → Reset all local data**.
 
-## 🏗 Build
+Images are stored as base64 data URLs on the row itself — downscaled to a
+1600px long edge via canvas before being saved. Keep gallery sizes reasonable;
+browser storage is finite.
+
+## Build
 
 ```bash
 npm run build      # outputs to dist/
-npm run preview    # preview the production build
+npm run preview
 ```
 
-## 🎨 Brand
+## Tech
 
-Palette drawn from the Thridhavarnam logo — cream `#f7ead9`, deep maroon,
-and temple gold. Logo lives at `public/logo.svg`.
-
-## 🛠 Tech
-
-React 18 · Vite · React Router · Fetch (no other runtime deps)
+React 18 · Vite · React Router · zero runtime deps beyond those.

@@ -1631,3 +1631,285 @@
 
   margin-top: 15px;
 }
+
+/* ============================================================
+   DARK / GLASS THEME OVERRIDE
+   Applied on top of the original light theme above. Keeps the
+   structural CSS (spacing, grid, flex) intact and re-paints the
+   surfaces to match the admin's black + glass morphism theme.
+   ============================================================ */
+
+.enquiry-page {
+  background: transparent;
+  color: var(--glass-text);
+}
+.enquiry-header h1 { color: var(--glass-text); }
+.enquiry-header p  { color: var(--glass-text-muted); }
+
+.enquiry-refresh-btn {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.enquiry-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ---- Summary (status) cards ---- */
+.enquiry-summary-card {
+  background: var(--glass);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  color: var(--glass-text);
+  box-shadow:
+    0 10px 40px -12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.enquiry-summary-card:hover {
+  background: var(--glass-strong);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.enquiry-summary-card.active {
+  border-color: var(--glass-text);
+  box-shadow:
+    0 0 0 1px rgba(245, 239, 228, 0.3),
+    0 14px 44px -12px rgba(0, 0, 0, 0.6);
+}
+.summary-card-top span:first-child { color: var(--glass-text-muted); }
+.summary-card-count { color: var(--glass-text); }
+
+/* ---- Filters card (search + status) ---- */
+.enquiry-filters {
+  background: var(--glass);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 10px 40px -12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.enquiry-search-wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.enquiry-search-wrapper > .icon,
+.enquiry-search-wrapper > svg { color: var(--glass-text-muted); }
+.enquiry-search-input {
+  background: transparent;
+  color: var(--glass-text);
+  border: none;
+}
+.enquiry-search-input::placeholder { color: var(--glass-text-muted); }
+.enquiry-status-filter {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.enquiry-status-filter option {
+  background: #141418;
+  color: var(--glass-text);
+}
+.enquiry-results-info { color: var(--glass-text-muted); }
+.enquiry-results-info strong { color: var(--glass-text); }
+
+/* ---- Table card ---- */
+.enquiry-table-card {
+  background: var(--glass);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 10px 40px -12px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.enquiry-table-desktop { background: transparent; }
+.enquiry-table { background: transparent; }
+.enquiry-table thead,
+.enquiry-table th {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--glass-text-muted);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.enquiry-table td {
+  color: var(--glass-text);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: transparent;
+}
+.enquiry-table tbody tr { background: transparent; }
+.enquiry-table tbody tr:hover { background: rgba(255, 255, 255, 0.04); }
+
+.customer-avatar {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--glass-text);
+}
+.customer-name { color: var(--glass-text); }
+.customer-email,
+.customer-phone { color: var(--glass-text-muted); }
+
+/* Enquiry ref cell (first column) */
+.enquiry-table td:first-child { color: var(--glass-text); }
+.enquiry-table td:first-child > div:last-child { color: var(--glass-text-muted); }
+
+/* Status select pills inside the table */
+.enquiry-status-select {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.enquiry-status-select option {
+  background: #141418;
+  color: var(--glass-text);
+}
+.status-new      { background: rgba(37, 99, 235, 0.2);  color: #93c5fd; border-color: rgba(96, 165, 250, 0.35); }
+.status-contacted{ background: rgba(217, 119, 6, 0.2);  color: #fcd34d; border-color: rgba(251, 191, 36, 0.35); }
+.status-progress { background: rgba(147, 51, 234, 0.2); color: #d8b4fe; border-color: rgba(192, 132, 252, 0.35); }
+.status-converted{ background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border-color: rgba(74, 222, 128, 0.35); }
+.status-closed   { background: rgba(255, 255, 255, 0.08); color: var(--glass-text-muted); border-color: rgba(255, 255, 255, 0.15); }
+
+/* Date cell */
+.enquiry-table td:nth-last-child(2) { color: var(--glass-text); }
+.enquiry-table td:nth-last-child(2) > div:last-child { color: var(--glass-text-muted); }
+
+/* Empty state */
+.enquiry-empty {
+  background: var(--glass);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  color: var(--glass-text);
+}
+.enquiry-empty h3 { color: var(--glass-text); }
+.enquiry-empty p  { color: var(--glass-text-muted); }
+
+/* Error banner */
+.enquiry-error {
+  background: rgba(225, 29, 72, 0.1);
+  border: 1px solid rgba(225, 29, 72, 0.3);
+  color: #fb7185;
+}
+
+/* ---- Modal (opaque, dark) ---- */
+.enquiry-modal-overlay {
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(6px);
+}
+.enquiry-modal {
+  background: #141418;
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 32px 64px -16px rgba(0, 0, 0, 0.8);
+}
+.modal-header {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.modal-header h2 { color: var(--glass-text); }
+.modal-header p  { color: var(--glass-text-muted); }
+.modal-reference {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.modal-close {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--glass-text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--glass-text);
+}
+
+.modal-body { color: var(--glass-text); background: transparent; }
+.modal-section { background: transparent; }
+.modal-section h3 {
+  color: var(--glass-text-muted);
+  letter-spacing: 0.08em;
+}
+.detail-grid {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.detail-item { background: transparent; border: none; }
+.detail-label { color: var(--glass-text-muted); }
+.detail-value { color: var(--glass-text); }
+.detail-link  { color: #f5efe4; }
+.detail-link:hover { color: #ffffff; text-decoration: underline; }
+
+.notes-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--glass-text);
+}
+.notes-box p { color: var(--glass-text); }
+.notes-box .no-notes { color: var(--glass-text-muted); font-style: italic; }
+
+.modal-footer {
+  background: transparent;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-status-select {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.modal-status-select option {
+  background: #141418;
+  color: var(--glass-text);
+}
+
+.modal-close-button {
+  background: #0a0a0a;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.modal-close-button:hover {
+  background: #1a1a20;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+/* Loading skeleton on dark */
+.enquiry-loading-card {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+}
+.loading-line,
+.loading-block {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Row action buttons (view / delete) */
+.view-button {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--glass-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.view-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--glass-text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.delete-button {
+  background: rgba(225, 29, 72, 0.08);
+  color: #fb7185;
+  border: 1px solid rgba(225, 29, 72, 0.25);
+}
+.delete-button:hover {
+  background: rgba(225, 29, 72, 0.18);
+  color: #fecdd3;
+}
+
+/* Mobile card list */
+.enquiry-mobile-card {
+  background: var(--glass);
+  backdrop-filter: blur(30px) saturate(160%);
+  -webkit-backdrop-filter: blur(30px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  color: var(--glass-text);
+}
+.mobile-info-label { color: var(--glass-text-muted); }

@@ -4,20 +4,19 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Products from './pages/Products'
-import Inventory from './pages/Inventory'
 import Orders from './pages/Orders'
 import Customers from './pages/Customers'
 import Payments from './pages/Payments'
-import Categories from './pages/Categories'
-import Occasions from './pages/Occasions'
-import Stories from './pages/Stories'
-import Banners from './pages/Banners'
-import Coupons from './pages/Coupons'
 import Analytics from './pages/Analytics'
-import Reviews from './pages/Reviews'
-import Settings from './pages/Settings'
+import Inventory from './pages/Inventory'
+import Categories from './pages/Categories'
+import EditTags from './pages/EditTags'
+import Journal from './pages/Journal'
+import Banners from './pages/Banners'
+import InSitu from './pages/InSitu'
+import HouseContent from './pages/HouseContent'
 import Enquiry from './pages/Enquiry'
-import PriceBuckets from './pages/PriceBuckets'
+import Settings from './pages/Settings'
 
 function Protected({ children }) {
   const { user, ready } = useAuth()
@@ -43,21 +42,20 @@ export default function App() {
         }
       >
         <Route path="/" element={<Dashboard />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/inventory" element={<Inventory />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/payments" element={<Payments />} />
-        <Route path="/categories" element={<Categories />} />
-        <Route path="/occasions" element={<Occasions />} />
-        <Route path="/stories" element={<Stories />} />
-        <Route path="/banners" element={<Banners />} />
-        <Route path="/coupons" element={<Coupons />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/reviews" element={<Reviews />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/categories" element={<Categories />} />
+        <Route path="/edit-tags" element={<EditTags />} />
+        <Route path="/journal" element={<Journal />} />
+        <Route path="/banners" element={<Banners />} />
+        <Route path="/in-situ" element={<InSitu />} />
+        <Route path="/house" element={<HouseContent />} />
+        <Route path="/enquiry" element={<Enquiry />} />
         <Route path="/settings" element={<Settings />} />
-        <Route path="/enquiry" element={<Enquiry/>}/>
-        <Route path="/price-buckets" element={<PriceBuckets />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

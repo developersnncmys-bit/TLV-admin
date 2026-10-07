@@ -1,8 +1,8 @@
 {
-  "name": "thridhavarnam-admin",
+  "name": "the-luxe-version-admin",
   "private": true,
   "version": "1.0.0",
-  "description": "Thridhavarnam Saree CRM — Admin Panel",
+  "description": "The Luxe Version — Studio Admin",
   "type": "module",
   "scripts": {
     "dev": "vite",

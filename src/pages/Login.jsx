@@ -1,19 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Wordmark from '../components/Wordmark'
 import { IconMail, IconLock, IconEye, IconEyeOff, IconArrowRight } from '../components/icons'
 
 const STATS = [
-  { v: '12K+', l: 'Orders managed' },
-  { v: '98%', l: 'On-time delivery' },
-  { v: '4.8★', l: 'Avg. rating' },
+  { v: '4',  l: 'Collections' },
+  { v: '∞',  l: 'Bespoke options' },
+  { v: '1',  l: 'Studio, in Bengaluru' },
 ]
 
 export default function Login() {
   const { login } = useAuth()
   const nav = useNavigate()
-  const [email, setEmail] = useState('riya@vastrasarees.in')
-  const [password, setPassword] = useState('password')
+  const [email, setEmail] = useState('admin@theluxeversion.com')
+  const [password, setPassword] = useState('Luxe@2026')
   const [show, setShow] = useState(false)
   const [remember, setRemember] = useState(true)
   const [err, setErr] = useState('')
@@ -36,32 +37,30 @@ export default function Login() {
     <div className="login-wrap">
       {/* ---- Brand panel ---- */}
       <div className="login-brand">
-        <div className="lb-glow lb-glow-1" />
-        <div className="lb-glow lb-glow-2" />
-
         <div className="lb-content">
           <div className="lb-logo">
-            <img src="/logo.svg" alt="Thridhavarnam" />
+            <Wordmark height={48} />
           </div>
 
-          <h1 className="lb-title">
-            Manage your saree business,<br />beautifully.
-          </h1>
-          <p className="lb-sub">
-            Track orders, delight customers, and grow your collection — all from one elegant dashboard.
-          </p>
-
-          <div className="lb-stats">
-            {STATS.map((s) => (
-              <div className="lb-stat" key={s.l}>
-                <div className="lb-stat-v">{s.v}</div>
-                <div className="lb-stat-l">{s.l}</div>
-              </div>
-            ))}
+          <div className="lb-pitch">
+            <h1 className="lb-title">
+              The Luxe Version,<br />Studio Admin.
+            </h1>
+            <p className="lb-sub">
+              Showpieces & light, redefined. Curate the collection, journal and enquiries — all from one quiet dashboard.
+            </p>
+            <div className="lb-stats">
+              {STATS.map((s) => (
+                <div className="lb-stat" key={s.l}>
+                  <div className="lb-stat-v">{s.v}</div>
+                  <div className="lb-stat-l">{s.l}</div>
+                </div>
+              ))}
+            </div>
           </div>
+
+          <div className="lb-foot">© {new Date().getFullYear()} The Luxe Version. All rights reserved.</div>
         </div>
-
-        <div className="lb-foot">© {new Date().getFullYear()} Thridhavarnam. All rights reserved.</div>
       </div>
 
       {/* ---- Form panel ---- */}
@@ -81,7 +80,7 @@ export default function Login() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@vastrasarees.in"
+                  placeholder="you@theluxeversion.com"
                   autoFocus
                   required
                 />

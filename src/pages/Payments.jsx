@@ -1,236 +1,499 @@
-import { useEffect, useState, useMemo } from 'react'
-import { payments as api, orders as ordApi } from '../api/client'
-import { inr, payStatusClass, titleCase } from '../lib/format'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  payments as api, orders as ordersApi, customers as customersApi,
+} from '../api/client'
+import { inr, inrK, fmtDate, titleCase } from '../lib/format'
 import { useToast } from '../context/ToastContext'
 import Modal from '../components/Modal'
+import ConfirmDialog from '../components/ConfirmDialog'
 import Pagination from '../components/Pagination'
-import { IconWallet, IconClock, IconRefresh, IconRupee, IconDownload, IconPlus, IconSearch } from '../components/icons'
+import {
+  IconPlus, IconSearch, IconPencil, IconTrash, IconDownload,
+  IconWallet, IconClock, IconRefresh, IconRupee,
+} from '../components/icons'
 
-const PAGE = 8
-const METHODS = ['UPI', 'Card', 'Net Banking', 'Wallet']
-const EMPTY = { orderId: '', customer: '', amount: '', method: 'UPI' }
-const TABS = [{ k: 'all', l: 'All' }, { k: 'paid', l: 'Paid' }, { k: 'pending', l: 'Pending' }, { k: 'refunded', l: 'Refunded' }]
+const PAGE = 10
 
+const STATUS_FLOW = ['paid', 'pending', 'refunded']
+const STATUS_CLASS = { paid: 'green', pending: 'amber', refunded: 'red' }
+
+const METHODS = [
+  { k: 'upi',   label: 'UPI' },
+  { k: 'card',  label: 'Card' },
+  { k: 'bank',  label: 'Bank transfer' },
+  { k: 'cash',  label: 'Cash' },
+  { k: 'wire',  label: 'International wire' },
+]
+const METHOD_LABEL = Object.fromEntries(METHODS.map((m) => [m.k, m.label]))
+
+const EMPTY = {
+  ref: '',
+  orderId: '',
+  customer: { name: '', email: '' },
+  amount: 0,
+  method: 'upi',
+  status: 'paid',
+  reference: '',
+  notes: '',
+}
+
+const initials = (name) =>
+  String(name || '')
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
 
 export default function Payments() {
   const toast = useToast()
   const [rows, setRows] = useState(null)
   const [orders, setOrders] = useState([])
+  const [customers, setCustomers] = useState([])
   const [q, setQ] = useState('')
-  const [tab, setTab] = useState('all')
-  const [recording, setRecording] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
-  const [page, setPage] = useState(1)
+  const [confirm, setConfirm] = useState(null)
 
   const load = () => api.list().then(setRows).catch((e) => toast.bad(e.message))
-  useEffect(() => { load(); ordApi.list().then(setOrders).catch(() => {}) }, [])
-  useEffect(() => { setPage(1) }, [q, tab])
 
-  const stats = useMemo(() => {
-    if (!rows) return null
-    return {
-      collected: rows.filter((p) => p.status === 'paid').reduce((s, p) => s + (p.amount || 0), 0),
-      pending: rows.filter((p) => p.status === 'pending').reduce((s, p) => s + (p.amount || 0), 0),
-      refunded: rows.filter((p) => p.status === 'refunded').reduce((s, p) => s + (p.amount || 0), 0),
-      count: rows.length,
-    }
+  useEffect(() => {
+    load()
+    ordersApi.list().then(setOrders).catch(() => {})
+    customersApi.list().then(setCustomers).catch(() => {})
+  }, [])
+
+  useEffect(() => { setPage(1) }, [q, statusFilter])
+
+  const summary = useMemo(() => {
+    const base = { collected: 0, pending: 0, refunded: 0, count: 0 }
+    if (!rows) return base
+    rows.forEach((p) => {
+      base.count += 1
+      const amt = Number(p.amount) || 0
+      if (p.status === 'paid') base.collected += amt
+      else if (p.status === 'pending') base.pending += amt
+      else if (p.status === 'refunded') base.refunded += amt
+    })
+    return base
   }, [rows])
 
   const filtered = useMemo(() => {
     if (!rows) return []
+    const query = q.trim().toLowerCase()
     return rows.filter((p) => {
-      if (tab !== 'all' && p.status !== tab) return false
-      if (q && !`${p.customer} ${p.orderId} ${p.id} ${p.method}`.toLowerCase().includes(q.toLowerCase())) return false
-      return true
+      if (statusFilter !== 'all' && (p.status || 'pending') !== statusFilter) return false
+      if (!query) return true
+      const hay = [
+        p.ref || p.id, p.orderId, p.reference,
+        p.customer?.name, p.customer?.email, p.notes,
+      ].filter(Boolean).join(' ').toLowerCase()
+      return hay.includes(query)
     })
-  }, [rows, q, tab])
+  }, [rows, q, statusFilter])
+
   const paged = filtered.slice((page - 1) * PAGE, page * PAGE)
 
-  function onOrder(e) {
-    const id = e.target.value
-    const o = orders.find((x) => x.id === id)
-    setForm((f) => ({ ...f, orderId: id, customer: o?.customer || f.customer, amount: o ? String(o.amount) : f.amount }))
+  // ---- Modal helpers ---------------------------------------------------
+  function openNew() {
+    setForm({ ...EMPTY, customer: { ...EMPTY.customer } })
+    setEditing({})
   }
 
-  async function record(e) {
-    e.preventDefault()
-    if (!form.customer.trim()) return toast.bad('Customer is required')
+  function openEdit(p) {
+    setForm({
+      ref: p.ref || p.id || '',
+      orderId: p.orderId || '',
+      customer: {
+        name: p.customer?.name || '',
+        email: p.customer?.email || '',
+      },
+      amount: Number(p.amount) || 0,
+      method: p.method || 'upi',
+      status: p.status || 'paid',
+      reference: p.reference || '',
+      notes: p.notes || '',
+    })
+    setEditing(p)
+  }
+
+  function pickOrder(orderId) {
+    if (!orderId) {
+      setForm((f) => ({ ...f, orderId: '' }))
+      return
+    }
+    const o = orders.find((x) => x.id === orderId)
+    if (!o) return
+    setForm((f) => ({
+      ...f,
+      orderId,
+      customer: {
+        name: o.customer?.name || f.customer.name,
+        email: o.customer?.email || f.customer.email,
+      },
+      amount: Number(o.amount) || f.amount,
+    }))
+  }
+
+  async function save(e) {
+    if (e && e.preventDefault) e.preventDefault()
+    if (!form.customer.name.trim()) return toast.bad('Customer name is required')
+    const amount = Math.max(0, Number(form.amount) || 0)
+    if (amount <= 0) return toast.bad('Amount must be greater than zero')
+
     setSaving(true)
     try {
-      await api.record({ ...form, amount: Number(form.amount) || 0 })
-      toast.ok('Payment recorded')
-      setRecording(false); setForm(EMPTY); load()
+      const payload = {
+        ref: form.ref.trim() || undefined,
+        orderId: form.orderId || '',
+        customer: {
+          name: form.customer.name.trim(),
+          email: form.customer.email.trim(),
+        },
+        amount,
+        currency: 'INR',
+        method: form.method,
+        status: form.status,
+        reference: form.reference.trim(),
+        notes: form.notes.trim(),
+      }
+      if (editing.id) {
+        await api.update(editing.id, payload)
+        toast.ok('Payment updated')
+      } else {
+        await api.create(payload)
+        toast.ok('Payment recorded')
+      }
+      setEditing(null)
+      load()
     } catch (e) { toast.bad(e.message) } finally { setSaving(false) }
   }
 
-  async function markPaid(p) {
-    try { await api.markPaid(p.id); toast.ok('Marked as paid'); load() }
-    catch (e) { toast.bad(e.message) }
+  async function doDelete() {
+    setSaving(true)
+    try {
+      await api.remove(confirm.id)
+      toast.ok('Payment removed')
+      setConfirm(null)
+      load()
+    } catch (e) { toast.bad(e.message) } finally { setSaving(false) }
   }
 
-  // CSV escape: wrap in quotes and double any existing quotes so
-  // commas, newlines and quotes inside cells don't break the columns.
-  function csvCell(v) {
-    const s = v == null ? '' : String(v)
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  async function changeStatus(p, status) {
+    try {
+      await api.update(p.id, { status })
+      load()
+    } catch (e) { toast.bad(e.message) }
   }
 
-  // Export the currently filtered/searched payments as a CSV download.
-  // Exports what the admin sees — respects the active tab + search box,
-  // ignores pagination.
+  // CSV export (no server — just a client-side download).
   function exportCsv() {
-    if (!filtered || filtered.length === 0) return toast.bad('Nothing to export')
-    const headers = ['id', 'orderId', 'customer', 'amount', 'method', 'status', 'date']
-    const lines = [headers.join(',')]
-    for (const p of filtered) {
-      lines.push(headers.map((h) => csvCell(p[h])).join(','))
+    const header = ['Payment ID', 'Order', 'Customer', 'Email', 'Amount (INR)', 'Method', 'Status', 'Reference', 'Date', 'Notes']
+    const esc = (v) => {
+      const s = String(v ?? '')
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
     }
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const lines = [header.join(',')]
+    filtered.forEach((p) => {
+      lines.push([
+        p.ref || p.id,
+        p.orderId || '',
+        p.customer?.name || '',
+        p.customer?.email || '',
+        Number(p.amount) || 0,
+        METHOD_LABEL[p.method] || p.method || '',
+        p.status || '',
+        p.reference || '',
+        p.createdAt ? new Date(p.createdAt).toISOString().slice(0, 10) : '',
+        p.notes || '',
+      ].map(esc).join(','))
+    })
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    const stamp = new Date().toISOString().slice(0, 10)
     a.href = url
-    a.download = `payments-${stamp}.csv`
+    a.download = `luxe-payments-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     toast.ok(`Exported ${filtered.length} payment${filtered.length === 1 ? '' : 's'}`)
   }
-  async function refund(p) {
-    if (!confirm(`Refund ${inr(p.amount)} to ${p.customer}? The linked order will be cancelled.`)) return
-    try { await api.refund(p.id); toast.ok('Payment refunded'); load() }
-    catch (e) { toast.bad(e.message) }
-  }
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
-  const cards = stats ? [
-    { label: 'Collected', value: inr(stats.collected), Icon: IconWallet, cls: 'c-cus' },
-    { label: 'Pending', value: inr(stats.pending), Icon: IconClock, cls: 'c-ord' },
-    { label: 'Refunded', value: inr(stats.refunded), Icon: IconRefresh, cls: 'c-rev' },
-    { label: 'Transactions', value: stats.count, Icon: IconRupee, cls: 'c-stk' },
-  ] : []
+  const chips = [
+    { k: 'all',      label: 'All',      n: rows?.length || 0 },
+    { k: 'paid',     label: 'Paid',     n: rows?.filter((p) => p.status === 'paid').length || 0 },
+    { k: 'pending',  label: 'Pending',  n: rows?.filter((p) => p.status === 'pending').length || 0 },
+    { k: 'refunded', label: 'Refunded', n: rows?.filter((p) => p.status === 'refunded').length || 0 },
+  ]
+
+  const statCards = [
+    { label: 'Collected',    value: inrK(summary.collected), Icon: IconWallet },
+    { label: 'Pending',      value: inrK(summary.pending),   Icon: IconClock },
+    { label: 'Refunded',     value: inrK(summary.refunded),  Icon: IconRefresh },
+    { label: 'Transactions', value: summary.count,           Icon: IconRupee },
+  ]
+
+  // Customer autocomplete list (unique names from stored customers +
+  // any names already seen on an order/payment).
+  const customerNames = useMemo(() => {
+    const set = new Set()
+    customers.forEach((c) => c.name && set.add(c.name))
+    orders.forEach((o) => o.customer?.name && set.add(o.customer.name))
+    rows?.forEach((p) => p.customer?.name && set.add(p.customer.name))
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [customers, orders, rows])
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Payments</h1>
-          <p>Track transactions, settlements and refunds</p>
+          <p>Track transactions, settlements and refunds · {summary.count} on the ledger</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-outline" onClick={exportCsv}><IconDownload size={17} /> Export</button>
-          <button className="btn btn-primary" onClick={() => { setForm(EMPTY); setRecording(true) }}><IconPlus size={18} /> Record Payment</button>
+          <button className="btn btn-outline" onClick={exportCsv} disabled={!rows?.length}>
+            <IconDownload size={16} /> Export
+          </button>
+          <button className="btn btn-primary" onClick={openNew}>
+            <IconPlus size={18} /> Record Payment
+          </button>
         </div>
       </div>
 
-      {stats && (
-        <div className="stat-grid">
-          {cards.map((c) => (
-            <div className={`stat inv-stat ${c.cls}`} key={c.label}>
-              <div className="st-ico"><c.Icon size={20} /></div>
-              <div className="st-label">{c.label}</div>
-              <div className="st-value">{c.value}</div>
+      <div className="stat-grid">
+        {statCards.map((c) => (
+          <div className="stat stat-dark" key={c.label}>
+            <div className="stat-top">
+              <div className="st-ico"><c.Icon size={18} /></div>
             </div>
+            <div className="st-value">{c.value}</div>
+            <div className="st-label">{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card filter-bar">
+        <div className="chips">
+          {chips.map((c) => (
+            <button
+              key={c.k}
+              className={`chip ${statusFilter === c.k ? 'active' : ''}`}
+              onClick={() => setStatusFilter(c.k)}
+            >
+              {c.label} · {c.n}
+            </button>
           ))}
         </div>
-      )}
-
-      <div className="card">
-        <div className="tab-bar">
-          <div className="tabs">
-            {TABS.map((t) => (
-              <button key={t.k} className={`tab ${tab === t.k ? 'active' : ''}`} onClick={() => setTab(t.k)}>{t.l}</button>
-            ))}
-          </div>
-          <div className="search-box tab-search">
-            <IconSearch size={17} />
-            <input placeholder="Search payments…" value={q} onChange={(e) => setQ(e.target.value)} />
-          </div>
+        <div className="search-box grow">
+          <IconSearch size={18} />
+          <input
+            placeholder="Search by payment #, order, customer…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
         </div>
-        {!rows ? <div className="spinner" /> : filtered.length === 0 ? (
-          <div className="empty"><div className="em-ico">💳</div><p>No payments found</p></div>
-        ) : (
-          <>
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr><th>Payment ID</th><th>Order</th><th>Customer</th><th className="num">Amount</th><th>Method</th><th>Status</th><th>Date</th><th></th></tr>
-              </thead>
-              <tbody>
-                {paged.map((p) => (
-                  <tr key={p.id}>
-                    <td className="mono-sku">{p.id}</td>
-                    <td style={{ fontWeight: 600 }}>{p.orderId || '—'}</td>
-                    <td>
-                      <div className="person">
-                        <div className="avatar">{p.avatar}</div>
-                        <div className="p-name">{p.customer}</div>
-                      </div>
-                    </td>
-                    <td className="num" style={{ fontWeight: 700 }}>{inr(p.amount)}</td>
-                    <td>{p.method}</td>
-                    <td><span className={`badge ${payStatusClass[p.status] || 'grey'}`}>{titleCase(p.status)}</span></td>
-                    <td className="p-sub">{p.date}</td>
-                    <td>
-                      <div className="cell-actions">
-                        {p.status === 'pending' && (
-                          <button className="btn btn-ghost btn-sm" onClick={() => markPaid(p)}>Mark paid</button>
-                        )}
-                        {p.status === 'paid' && (
-                          <button className="icon-btn danger" title="Refund" onClick={() => refund(p)}><IconRefresh size={16} /></button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="table-pager"><Pagination page={page} pageSize={PAGE} total={filtered.length} onChange={setPage} /></div>
-          </>
-        )}
       </div>
 
-      {recording && (
+      {!rows ? (
+        <div className="spinner" />
+      ) : filtered.length === 0 ? (
+        <div className="card">
+          <div className="empty">
+            <div className="em-ico">💳</div>
+            <p>No payments match this filter</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="card">
+            <div className="table-wrap">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th>Payment ID</th>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th className="num">Amount</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paged.map((p) => (
+                    <tr key={p.id}>
+                      <td style={{ fontWeight: 700 }}>{p.ref || p.id}</td>
+                      <td>
+                        {p.orderId
+                          ? <span style={{ fontWeight: 600 }}>{p.orderId}</span>
+                          : <span style={{ color: 'var(--glass-text-muted)' }}>—</span>}
+                      </td>
+                      <td>
+                        <div className="person">
+                          <span className="avatar">{initials(p.customer?.name)}</span>
+                          <div>
+                            <div className="p-name">{p.customer?.name || '—'}</div>
+                            {p.customer?.email && (
+                              <div className="p-sub">{p.customer.email}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="num" style={{ fontWeight: 700 }}>{inr(p.amount)}</td>
+                      <td style={{ textTransform: 'uppercase', fontSize: 12, letterSpacing: 0.4, color: 'var(--glass-text-muted)' }}>
+                        {METHOD_LABEL[p.method] || p.method || '—'}
+                      </td>
+                      <td>
+                        <select
+                          className={`order-status-select st-${p.status || 'pending'}`}
+                          value={p.status || 'pending'}
+                          onChange={(e) => changeStatus(p, e.target.value)}
+                        >
+                          {STATUS_FLOW.map((s) => (
+                            <option key={s} value={s}>{titleCase(s)}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={{ color: 'var(--glass-text-muted)' }}>{fmtDate(p.createdAt)}</td>
+                      <td>
+                        <div className="cell-actions">
+                          <button className="icon-btn" title="Edit" onClick={() => openEdit(p)}>
+                            <IconPencil size={15} />
+                          </button>
+                          <button className="icon-btn danger" title="Delete" onClick={() => setConfirm(p)}>
+                            <IconTrash size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <Pagination page={page} pageSize={PAGE} total={filtered.length} onChange={setPage} />
+        </>
+      )}
+
+      {editing && (
         <Modal
-          title="Record Payment"
-          subtitle="Log a payment received against an order"
-          onClose={() => setRecording(false)}
+          title={editing.id ? 'Edit Payment' : 'Record Payment'}
+          subtitle={editing.id ? (editing.ref || editing.id) : 'Log a payment received against an order'}
+          onClose={() => setEditing(null)}
           footer={
             <>
-              <button className="btn btn-outline" onClick={() => setRecording(false)}>Cancel</button>
-              <button className="btn btn-primary" onClick={record} disabled={saving}><IconRupee size={16} /> {saving ? 'Recording…' : 'Record Payment'}</button>
+              <button className="btn btn-outline" onClick={() => setEditing(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={save} disabled={saving}>
+                {saving ? 'Saving…' : editing.id ? 'Save changes' : 'Record Payment'}
+              </button>
             </>
           }
         >
-          <form onSubmit={record}>
+          <form onSubmit={save}>
             <div className="field full">
               <label>Link to order</label>
-              <select value={form.orderId} onChange={onOrder}>
+              <select
+                value={form.orderId}
+                onChange={(e) => pickOrder(e.target.value)}
+              >
                 <option value="">— None —</option>
-                {orders.map((o) => <option key={o.id} value={o.id}>{o.id} · {o.customer} · {inr(o.amount)}</option>)}
+                {orders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.ref || o.id} · {o.customer?.name || '—'} · {inr(o.amount)}
+                  </option>
+                ))}
               </select>
+              <span className="img-hint">
+                Picking an order fills customer and amount. Leave as "None" for standalone payments
+                (consultation fees, deposits, etc.).
+              </span>
             </div>
+
             <div className="form-grid">
               <div className="field">
                 <label>Customer</label>
-                <input value={form.customer} onChange={set('customer')} placeholder="Ananya Iyer" />
+                <input
+                  value={form.customer.name}
+                  onChange={(e) => setForm((f) => ({ ...f, customer: { ...f.customer, name: e.target.value } }))}
+                  placeholder="e.g. Ananya Iyer"
+                  list="payment-customer-list"
+                  autoFocus={!editing.id}
+                />
+                <datalist id="payment-customer-list">
+                  {customerNames.map((n) => <option key={n} value={n} />)}
+                </datalist>
               </div>
               <div className="field">
                 <label>Amount (₹)</label>
-                <input type="number" value={form.amount} onChange={set('amount')} placeholder="18999" />
+                <input
+                  type="number"
+                  min="0"
+                  value={form.amount}
+                  onChange={(e) => setForm((f) => ({ ...f, amount: Math.max(0, Number(e.target.value) || 0) }))}
+                  placeholder="142500"
+                />
               </div>
             </div>
-            <div className="field full">
+
+            <div className="field full" style={{ marginTop: 14 }}>
               <label>Method</label>
-              <select value={form.method} onChange={set('method')}>
-                {METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
+              <select
+                value={form.method}
+                onChange={(e) => setForm((f) => ({ ...f, method: e.target.value }))}
+              >
+                {METHODS.map((m) => <option key={m.k} value={m.k}>{m.label}</option>)}
               </select>
+            </div>
+
+            <div className="form-grid" style={{ marginTop: 14 }}>
+              <div className="field">
+                <label>Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                >
+                  {STATUS_FLOW.map((s) => <option key={s} value={s}>{titleCase(s)}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>External reference</label>
+                <input
+                  value={form.reference}
+                  onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
+                  placeholder="Gateway txn id, cheque #, UTR…"
+                />
+              </div>
+            </div>
+
+            <div className="field full" style={{ marginTop: 14 }}>
+              <label>Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={3}
+                placeholder="Deposit, final payment, partial refund…"
+              />
             </div>
           </form>
         </Modal>
+      )}
+
+      {confirm && (
+        <ConfirmDialog
+          title="Delete payment"
+          message={`Delete ${confirm.ref || confirm.id} (${inr(confirm.amount)})? The linked order is not affected, but the ledger entry is permanently removed.`}
+          confirmLabel="Yes, delete"
+          cancelLabel="No, cancel"
+          onConfirm={doDelete}
+          onClose={() => setConfirm(null)}
+          busy={saving}
+        />
       )}
     </>
   )

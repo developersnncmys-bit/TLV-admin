@@ -289,7 +289,7 @@ export default function Enquiry() {
             <h1>Enquiries</h1>
 
             <p>
-              Manage bespoke saree enquiries received from the website.
+              Bespoke, appointment and interior consultation enquiries from the website.
             </p>
           </div>
 
@@ -557,7 +557,7 @@ function EnquiryTable({
                     </div>
 
                     <div className="reference-sub">
-                      Bespoke enquiry
+                      Studio enquiry
                     </div>
                   </td>
 
@@ -595,11 +595,11 @@ function EnquiryTable({
                     <div className="requirement-cell">
 
                       <div className="requirement-main">
-                        {item.occasion || '-'}
+                        {item.category || item.weave || '-'}
                       </div>
 
                       <div className="requirement-sub">
-                        {item.weave || 'Open to suggestions'}
+                        {item.occasion || 'Open to suggestions'}
                       </div>
 
                       {item.timeline && (
@@ -742,7 +742,7 @@ function EnquiryTable({
               <div className="mobile-details">
 
                 <InfoBox
-                  label="Occasion"
+                  label="Space"
                   value={item.occasion}
                 />
 
@@ -1034,19 +1034,19 @@ function EnquiryModal({
 
           </ModalSection>
 
-          {/* Saree requirement */}
+          {/* Piece requirement */}
 
-          <ModalSection title="Saree Requirement">
+          <ModalSection title="Piece Requirement">
 
             <div className="detail-grid">
 
               <DetailItem
-                label="Preferred Weave"
-                value={enquiry.weave}
+                label="Category"
+                value={enquiry.weave || enquiry.category}
               />
 
               <DetailItem
-                label="Occasion"
+                label="Space"
                 value={enquiry.occasion}
               />
 

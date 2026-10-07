@@ -1,46 +1,54 @@
-// Helpers for saree image handling.
+// Image helpers for the standalone (API-less) admin.
 //
-// Storage model: images live on Cloudinary. Uploads go through OUR
-// backend (POST /api/upload) which holds the signed Cloudinary
-// credentials — the admin browser never sees the api_secret. The
-// backend returns the https URL, which we save on the product's
-// `image` / `images[].url` fields. Legacy products may still hold
-// `data:image` URLs — those keep rendering fine.
-import { getToken } from '../api/client'
-
-const BASE =
-  import.meta.env.VITE_API_URL ||
-  // (import.meta.env.PROD ? 'http://localhost:5000/api' : '/api')
-  (import.meta.env.PROD ? 'https://api.thridhavarnam.com/api' : '/api')
+// Uploads are read client-side into a base64 data URL and stored
+// directly on the row. No remote upload, no backend. Images persist
+// in localStorage like any other field. Large galleries will bloat
+// storage, so uploads are size-capped and optionally downscaled.
 
 export const isImageSrc = (v) =>
   typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('http') || v.startsWith('/'))
 
-// Upload a single File to our backend, which forwards it to Cloudinary
-// and returns { url, publicId, ... }. Throws with a readable message on
-// failure so the caller can toast it.
-export async function uploadImage(file) {
-  const body = new FormData()
-  body.append('file', file)
+const MAX_BYTES = 2 * 1024 * 1024 // 2 MB per image after encoding
 
-  const headers = {}
-  const token = getToken()
-  if (token) headers.Authorization = `Bearer ${token}`
-
-  const res = await fetch(`${BASE}/upload`, {
-    method: 'POST',
-    headers,
-    body,
+function readAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('Could not read file'))
+    reader.readAsDataURL(file)
   })
-  if (!res.ok) {
-    let message = `Upload failed (${res.status})`
-    try {
-      const err = await res.json()
-      if (err?.message) message = err.message
-    } catch {}
-    throw new Error(message)
+}
+
+// Downscale an image via <canvas>. Keeps aspect ratio, caps the
+// longest edge at `maxEdge` px, re-encodes as JPEG at the given
+// quality. Returns a data: URL.
+async function downscale(dataUrl, maxEdge = 1600, quality = 0.82) {
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image()
+    el.onload = () => resolve(el)
+    el.onerror = () => reject(new Error('Image decode failed'))
+    el.src = dataUrl
+  })
+  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
+  if (scale >= 1) return dataUrl
+  const w = Math.round(img.width * scale)
+  const h = Math.round(img.height * scale)
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  ctx.drawImage(img, 0, 0, w, h)
+  return canvas.toDataURL('image/jpeg', quality)
+}
+
+export async function uploadImage(file) {
+  if (!file || !file.type?.startsWith('image/')) {
+    throw new Error('Please pick an image file')
   }
-  const json = await res.json()
-  if (!json.url) throw new Error('Server response missing url')
-  return json.url
+  const raw = await readAsDataURL(file)
+  const shrunk = await downscale(raw).catch(() => raw)
+  if (shrunk.length > MAX_BYTES * 1.4) {
+    throw new Error('Image is too large after compression — try a smaller file')
+  }
+  return shrunk
 }
