@@ -515,8 +515,8 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
   font-weight: 700; font-size: 12.5px; flex-shrink: 0;
 }
 .person { display: flex; align-items: center; gap: 11px; }
-.person .p-name { font-weight: 600; color: var(--ink-900); }
-.person .p-sub { font-size: 12px; color: var(--ink-500); }
+.person .p-name { font-weight: 600; color: var(--glass-text); }
+.person .p-sub { font-size: 12px; color: var(--glass-text-muted); }
 
 .prod-emoji {
   width: 40px; height: 40px; border-radius: 0.625rem;
@@ -2205,3 +2205,133 @@ table.data .num { text-align: right; font-variant-numeric: tabular-nums; }
 .top-rev-row:hover .top-rev-bar > span {
   filter: brightness(1.15);
 }
+
+/* ============================================================
+   Material tag picker (Products modal)
+   Dark pill chips that read well on both dark glass and light
+   modal surfaces. Active chip inverts to a solid cream fill.
+   ============================================================ */
+.material-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.material-chip {
+  padding: 7px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgba(10, 10, 10, 0.18);
+  background: rgba(10, 10, 10, 0.04);
+  color: var(--ink-800, #36363e);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.material-chip:hover {
+  background: rgba(10, 10, 10, 0.08);
+  border-color: rgba(10, 10, 10, 0.35);
+}
+.material-chip:active { transform: scale(0.97); }
+.material-chip.active {
+  background: #0a0a0a;
+  color: #ffffff;
+  border-color: #0a0a0a;
+}
+.material-chip.active:hover {
+  background: #1a1a20;
+  border-color: #1a1a20;
+}
+
+/* On any dark surface (glass card, dark modal override), re-skin the
+   chips to high-contrast light-on-dark. Scoped so it only kicks in if
+   the chip sits inside a dark-themed container. */
+.card .material-chip,
+.stat.stat-dark .material-chip {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--glass-text);
+}
+.card .material-chip:hover,
+.stat.stat-dark .material-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.card .material-chip.active,
+.stat.stat-dark .material-chip.active {
+  background: #f5efe4;
+  color: #0a0a0a;
+  border-color: #f5efe4;
+}
+.card .material-chip.active:hover,
+.stat.stat-dark .material-chip.active:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+}
+
+/* ============================================================
+   Toggle row (checkbox + title + inline hint, as a single tile)
+   Resilient against parent grid context so it always sits as a
+   clean full-width row with the box aligned to the title.
+   ============================================================ */
+.toggle-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+  margin: 14px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(10, 10, 10, 0.1);
+  background: rgba(10, 10, 10, 0.03);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.toggle-row:hover {
+  background: rgba(10, 10, 10, 0.06);
+  border-color: rgba(10, 10, 10, 0.18);
+}
+.toggle-row input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  margin: 2px 0 0;
+  accent-color: #0a0a0a;
+  cursor: pointer;
+}
+.toggle-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.toggle-row-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink-900, #1f1f24);
+  line-height: 1.3;
+}
+.toggle-row-hint {
+  font-size: 12px;
+  color: var(--ink-500, #616373);
+  line-height: 1.45;
+}
+
+/* Dark variants when the row sits on a dark glass surface */
+.card .toggle-row,
+.stat.stat-dark .toggle-row {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+.card .toggle-row:hover,
+.stat.stat-dark .toggle-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.card .toggle-row input[type="checkbox"],
+.stat.stat-dark .toggle-row input[type="checkbox"] { accent-color: #f5efe4; }
+.card .toggle-row-title,
+.stat.stat-dark .toggle-row-title { color: var(--glass-text); }
+.card .toggle-row-hint,
+.stat.stat-dark .toggle-row-hint { color: var(--glass-text-muted); }

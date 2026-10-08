@@ -410,21 +410,15 @@ export default function Products() {
 
             <div className="field full">
               <label>Material tags</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              <div className="material-chips">
                 {MATERIAL_TAG_OPTIONS.map((tag) => {
                   const selected = (form.materialTags || []).map((x) => x.toLowerCase()).includes(tag.toLowerCase())
                   return (
                     <button
                       type="button"
                       key={tag}
+                      className={`material-chip ${selected ? 'active' : ''}`}
                       onClick={() => toggleMaterialTag(tag)}
-                      style={{
-                        border: `1px solid ${selected ? '#fff' : 'rgba(255,255,255,0.3)'}`,
-                        background: selected ? 'rgba(255,255,255,0.12)' : 'transparent',
-                        color: selected ? '#fff' : 'var(--glass-text-soft)',
-                        padding: '4px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 500,
-                        letterSpacing: 0.4, cursor: 'pointer',
-                      }}
                     >
                       {tag}
                     </button>
@@ -449,17 +443,17 @@ export default function Products() {
               </div>
             </div>
 
-            <div className="field full">
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={!!form.bespoke}
-                  onChange={(e) => setForm((f) => ({ ...f, bespoke: e.target.checked }))}
-                />
-                Available for bespoke commission
-              </label>
-              <span className="img-hint">Shows a "Bespoke available" tag on the storefront.</span>
-            </div>
+            <label className="toggle-row">
+              <input
+                type="checkbox"
+                checked={!!form.bespoke}
+                onChange={(e) => setForm((f) => ({ ...f, bespoke: e.target.checked }))}
+              />
+              <span className="toggle-row-body">
+                <span className="toggle-row-title">Available for bespoke commission</span>
+                <span className="toggle-row-hint">Shows a "Bespoke available" tag on the storefront.</span>
+              </span>
+            </label>
 
             <h4 className="form-section">Product detail page</h4>
 
