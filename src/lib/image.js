@@ -1,14 +1,16 @@
-// Image helpers for the standalone (API-less) admin.
+// Image helpers for the admin panel.
 //
-// Uploads are read client-side into a base64 data URL and stored
-// directly on the row. No remote upload, no backend. Images persist
-// in localStorage like any other field. Large galleries will bloat
-// storage, so uploads are size-capped and optionally downscaled.
+// Uploads go to the TLV backend (POST /api/uploads/image), which stores
+// them in Cloudinary and returns a secure URL. The URL is what's saved
+// on the row — not a data URL. We still downscale on the client first so
+// we don't ship a 20 MB phone photo to the server untouched.
+
+import { uploadImageToBackend } from '../api/uploads.js'
 
 export const isImageSrc = (v) =>
   typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('http') || v.startsWith('/'))
 
-const MAX_BYTES = 2 * 1024 * 1024 // 2 MB per image after encoding
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // mirrors the backend's multer cap
 
 function readAsDataURL(file) {
   return new Promise((resolve, reject) => {
@@ -19,18 +21,21 @@ function readAsDataURL(file) {
   })
 }
 
-// Downscale an image via <canvas>. Keeps aspect ratio, caps the
-// longest edge at `maxEdge` px, re-encodes as JPEG at the given
-// quality. Returns a data: URL.
-async function downscale(dataUrl, maxEdge = 1600, quality = 0.82) {
+// Downscale via <canvas>: keep aspect ratio, cap the longest edge at
+// `maxEdge`, re-encode as JPEG. Returns a Blob, or null if no scaling
+// was needed (caller should upload the original File in that case).
+async function downscaleToBlob(file, maxEdge = 1800, quality = 0.85) {
+  const dataUrl = await readAsDataURL(file)
   const img = await new Promise((resolve, reject) => {
     const el = new Image()
     el.onload = () => resolve(el)
     el.onerror = () => reject(new Error('Image decode failed'))
     el.src = dataUrl
   })
-  const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
-  if (scale >= 1) return dataUrl
+
+  if (Math.max(img.width, img.height) <= maxEdge) return null
+
+  const scale = maxEdge / Math.max(img.width, img.height)
   const w = Math.round(img.width * scale)
   const h = Math.round(img.height * scale)
   const canvas = document.createElement('canvas')
@@ -38,17 +43,33 @@ async function downscale(dataUrl, maxEdge = 1600, quality = 0.82) {
   canvas.height = h
   const ctx = canvas.getContext('2d')
   ctx.drawImage(img, 0, 0, w, h)
-  return canvas.toDataURL('image/jpeg', quality)
+  return await new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', quality),
+  )
 }
 
-export async function uploadImage(file) {
+// Uploads `file` to Cloudinary via the backend and returns the secure URL.
+// `folder` is an optional subfolder appended to the backend's CLOUDINARY_UPLOAD_FOLDER.
+export async function uploadImage(file, { folder } = {}) {
   if (!file || !file.type?.startsWith('image/')) {
     throw new Error('Please pick an image file')
   }
-  const raw = await readAsDataURL(file)
-  const shrunk = await downscale(raw).catch(() => raw)
-  if (shrunk.length > MAX_BYTES * 1.4) {
-    throw new Error('Image is too large after compression — try a smaller file')
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new Error('Image is too large — pick one under 10 MB')
   }
-  return shrunk
+
+  let toSend = file
+  try {
+    const shrunk = await downscaleToBlob(file)
+    if (shrunk) {
+      // Preserve the original filename stem so Cloudinary's public_id is readable.
+      const stem = (file.name || 'image').replace(/\.[^.]+$/, '')
+      toSend = new File([shrunk], `${stem}.jpg`, { type: 'image/jpeg' })
+    }
+  } catch {
+    // Downscale is best-effort — fall through and upload the original.
+  }
+
+  const { url } = await uploadImageToBackend(toSend, { folder })
+  return url
 }

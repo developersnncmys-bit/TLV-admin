@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { editTags as api, products as prodApi } from '../api/client'
+import { uploadImage, isImageSrc } from '../lib/image'
 import { useToast } from '../context/ToastContext'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -19,7 +20,22 @@ const gradOf = (c, i) =>
   COLORS.find((x) => x.key === c.color)?.grad ||
   COLORS.find((x) => x.key === CYCLE[i % CYCLE.length]).grad
 
-const EMPTY = { name: '', color: 'ink', tagline: '', order: '' }
+const EMPTY = {
+  name: '',
+  color: 'ink',
+  tagline: '',
+  // Admin-authored count displayed as "NN pieces in this edit" on the
+  // storefront. String here so the input stays empty-friendly; coerced
+  // to Number in the save payload.
+  piecesCount: '',
+  // Hero image for this edit tag section on the storefront's /edit page.
+  image: '',
+  // Featured piece label — free text, displayed next to the image.
+  productName: '',
+  // Longer editorial description below the tagline.
+  description: '',
+  order: '',
+}
 
 export default function EditTags() {
   const toast = useToast()
@@ -28,6 +44,7 @@ export default function EditTags() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [confirm, setConfirm] = useState(null)
   const [page, setPage] = useState(1)
 
@@ -52,9 +69,29 @@ export default function EditTags() {
       name: c.name || '',
       color: c.color || 'ink',
       tagline: c.tagline || '',
+      piecesCount: c.piecesCount != null ? String(c.piecesCount) : '',
+      image: c.image || '',
+      productName: c.productName || '',
+      description: c.description || '',
       order: c.order != null ? String(c.order) : '',
     })
     setEditing(c)
+  }
+
+  async function onFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadImage(file)
+      setForm((f) => ({ ...f, image: url }))
+      toast.ok('Image added')
+    } catch (err) {
+      toast.bad(err.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
   }
 
   async function save(e) {
@@ -66,6 +103,10 @@ export default function EditTags() {
         name: form.name.trim(),
         color: form.color,
         tagline: form.tagline.trim(),
+        piecesCount: Number(form.piecesCount) || 0,
+        image: form.image || '',
+        productName: form.productName.trim(),
+        description: form.description.trim(),
         order: Number(form.order) || 0,
       }
       if (editing.id) { await api.update(editing.id, payload); toast.ok('Edit tag updated') }
@@ -139,7 +180,7 @@ export default function EditTags() {
           footer={
             <>
               <button className="btn btn-outline" onClick={() => setEditing(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving}>
+              <button className="btn btn-primary" onClick={save} disabled={saving || uploading}>
                 {saving ? 'Saving…' : editing.id ? 'Save changes' : 'Create'}
               </button>
             </>
@@ -167,6 +208,80 @@ export default function EditTags() {
                 rows={2}
               />
               <span className="img-hint">Italic caption under this edit section on The Edit page.</span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Pieces in this edit</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.piecesCount}
+                onChange={(e) => setForm((f) => ({ ...f, piecesCount: e.target.value }))}
+                placeholder="e.g. 3"
+              />
+              <span className="img-hint">
+                Shown as &quot;NN pieces in this edit&quot; on the storefront.
+                Leave at 0 to hide the count.
+              </span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Feature image</label>
+              {isImageSrc(form.image) && (
+                <div style={{ marginBottom: 8 }}>
+                  <img
+                    src={form.image}
+                    alt=""
+                    style={{ maxWidth: 320, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }}
+                  />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={onFile}
+                disabled={uploading}
+              />
+              {uploading && <span className="img-hint">Processing…</span>}
+              {form.image && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ marginTop: 6, fontSize: 12 }}
+                  onClick={() => setForm((f) => ({ ...f, image: '' }))}
+                >
+                  Remove image
+                </button>
+              )}
+              <span className="img-hint">
+                Hero / feature image shown alongside this edit tag's section on
+                the storefront. Landscape or portrait both work.
+              </span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Featured piece name</label>
+              <input
+                value={form.productName}
+                onChange={(e) => setForm((f) => ({ ...f, productName: e.target.value }))}
+                placeholder="e.g. Chandelier — Verre"
+              />
+              <span className="img-hint">
+                Call-out label shown next to the feature image. Free text —
+                doesn&apos;t have to match a real product name.
+              </span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Longer editorial paragraph describing this edit — the pieces, the mood, the story."
+                rows={4}
+              />
+              <span className="img-hint">Shown below the tagline.</span>
             </div>
 
             <div className="field full" style={{ marginBottom: 14 }}>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { banners as api, categories as catsApi } from '../api/client'
 import { uploadImage, isImageSrc } from '../lib/image'
+import { uploadVideo } from '../lib/video'
 import { useToast } from '../context/ToastContext'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
@@ -13,6 +14,7 @@ const EMPTY = {
   id: '',
   type: 'hero',
   page: 'home',
+  section: '',
   weave: '',
   eyebrow: '',
   title: '',
@@ -62,6 +64,7 @@ export default function Banners() {
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingVideo, setUploadingVideo] = useState(false)
   const [confirm, setConfirm] = useState(null)
   const [page, setPage] = useState(1)
 
@@ -81,6 +84,7 @@ export default function Banners() {
       id: b.id || '',
       type: b.type || 'hero',
       page: b.page || 'home',
+      section: b.section || '',
       weave: b.type === 'weave' ? (b.weave || '') : '',
       eyebrow: b.eyebrow || legacyEyebrow,
       title: b.title || '',
@@ -112,6 +116,22 @@ export default function Banners() {
       toast.bad(err.message || 'Upload failed')
     } finally {
       setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function onVideoFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingVideo(true)
+    try {
+      const url = await uploadVideo(file)
+      setForm((f) => ({ ...f, videoUrl: url }))
+      toast.ok('Video uploaded')
+    } catch (err) {
+      toast.bad(err.message || 'Upload failed')
+    } finally {
+      setUploadingVideo(false)
       e.target.value = ''
     }
   }
@@ -151,6 +171,9 @@ export default function Banners() {
       const payload = {
         type: t,
         page: form.page || 'home',
+        // Section → storefront chapter slot (e.g. 'film', 'look'). Only
+        // meaningful on non-weave banners; blank means "whole-page banner".
+        section: t !== 'weave' ? (form.section || '').trim() : '',
         weave: t === 'weave' ? form.weave.trim() : '',
         eyebrow: hasEyebrow ? form.eyebrow.trim() : '',
         title: t !== 'weave' ? form.title.trim() : '',
@@ -328,7 +351,7 @@ export default function Banners() {
           footer={
             <>
               <button className="btn btn-outline" onClick={() => setEditing(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving || uploading}>
+              <button className="btn btn-primary" onClick={save} disabled={saving || uploading || uploadingVideo}>
                 {saving ? 'Saving…' : editing.id ? 'Save changes' : 'Create'}
               </button>
             </>
@@ -375,6 +398,32 @@ export default function Banners() {
                   {isHero
                     ? 'Hero slides are page-scoped. Each page shows the active hero with the lowest display order.'
                     : 'Which page this block renders on.'}
+                </span>
+              </div>
+            )}
+
+            {/* Section — only for non-hero, non-weave banners. Leaving blank
+                keeps the banner in the trailing BannerSections stack; filling
+                it in overrides a specific storefront chapter slot. */}
+            {(isParallax || isEditorial || isCtaBand) && (
+              <div className="field full" style={{ marginBottom: 14 }}>
+                <label>Section (optional)</label>
+                <input
+                  list="banner-section-suggestions"
+                  value={form.section}
+                  onChange={(e) => setForm((f) => ({ ...f, section: e.target.value }))}
+                  placeholder="e.g. film, look"
+                />
+                <datalist id="banner-section-suggestions">
+                  <option value="film" />
+                  <option value="look" />
+                </datalist>
+                <span className="img-hint">
+                  Leave blank → renders in the normal trailing banner stack.
+                  Set to <code>film</code> → overrides the ChapterFilm media
+                  on the home page.
+                  Set to <code>look</code> → overrides the ChapterLook cover
+                  on the home page.
                 </span>
               </div>
             )}
@@ -427,13 +476,49 @@ export default function Banners() {
 
             {canMedia && form.mediaType === 'video' && (
               <div className="field full" style={{ marginBottom: 14 }}>
-                <label>Video URL *</label>
+                <label>Video *</label>
+                {/* Two paths to set the video URL: upload a file (routes
+                    through Cloudinary via /api/uploads/video) or paste an
+                    existing URL. Either populates the same `videoUrl`
+                    field — the storefront only cares about the final URL. */}
                 <input
+                  type="file"
+                  accept="video/*"
+                  onChange={onVideoFile}
+                  disabled={uploadingVideo}
+                />
+                {uploadingVideo && (
+                  <span className="img-hint">Uploading… this can take a minute for larger files.</span>
+                )}
+                <input
+                  style={{ marginTop: 8 }}
                   value={form.videoUrl}
                   onChange={(e) => setForm((f) => ({ ...f, videoUrl: e.target.value }))}
-                  placeholder="https://… .mp4 or hosted video URL"
+                  placeholder="…or paste a video URL (https://…)"
                 />
-                <span className="img-hint">MP4 or hosted video (Vimeo, Cloudinary, etc.). Autoplayed muted on the storefront.</span>
+                {form.videoUrl && !uploadingVideo && (
+                  <video
+                    key={form.videoUrl}
+                    src={form.videoUrl}
+                    controls
+                    muted
+                    style={{ marginTop: 8, maxWidth: 320, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }}
+                  />
+                )}
+                {form.videoUrl && !uploadingVideo && (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ marginTop: 6, fontSize: 12 }}
+                    onClick={() => setForm((f) => ({ ...f, videoUrl: '' }))}
+                  >
+                    Remove video
+                  </button>
+                )}
+                <span className="img-hint">
+                  Upload up to 100 MB (mp4 / webm / mov) or paste a hosted URL
+                  (Vimeo, Cloudinary, etc.). Autoplayed muted on the storefront.
+                </span>
               </div>
             )}
 
