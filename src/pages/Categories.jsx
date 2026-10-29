@@ -147,7 +147,7 @@ export default function Categories() {
       <div className="page-head">
         <div>
           <h1>Categories</h1>
-          <p>Sculptures · Vases · Tabletop · Lighting</p>
+          <p>{rows && rows.length ? rows.slice(0, 3).map((c) => c.name).join(' · ') : '—'}</p>
         </div>
         <div className="page-actions">
           <button className="btn btn-primary" onClick={openNew}><IconPlus size={18} /> New Category</button>
