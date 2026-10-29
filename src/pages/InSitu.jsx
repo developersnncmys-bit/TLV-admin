@@ -14,7 +14,16 @@ const EMPTY = {
   productRef: '',
   productLabel: '',
   categoryLabel: '',
+  // The in-situ shot — the room photo, shown as the inset tile on the
+  // storefront's ChapterObject beat.
   image: '',
+  // Optional override for the hero tile. If blank, the storefront falls
+  // back to the matched Product's own image.
+  heroImage: '',
+  // Hero tile text overrides. Both optional — blank means the storefront
+  // uses the matched product's name and hides the sub-caption.
+  heroTitle: '',
+  heroCaption: '',
   order: 0,
   active: true,
 }
@@ -52,6 +61,9 @@ export default function InSitu() {
       productLabel: f.productLabel || '',
       categoryLabel: f.categoryLabel || '',
       image: f.image || '',
+      heroImage: f.heroImage || '',
+      heroTitle: f.heroTitle || '',
+      heroCaption: f.heroCaption || '',
       order: Number(f.order) || 0,
       active: f.active !== false,
     })
@@ -86,6 +98,22 @@ export default function InSitu() {
     }
   }
 
+  async function onHeroFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const url = await uploadImage(file)
+      setForm((f) => ({ ...f, heroImage: url }))
+      toast.ok('Hero image added')
+    } catch (err) {
+      toast.bad(err.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
   async function save(e) {
     e.preventDefault()
     if (!form.productLabel.trim()) return toast.bad('Pick a product or enter a label')
@@ -97,6 +125,9 @@ export default function InSitu() {
         productLabel: form.productLabel.trim(),
         categoryLabel: form.categoryLabel.trim(),
         image: form.image,
+        heroImage: form.heroImage || '',
+        heroTitle: form.heroTitle.trim(),
+        heroCaption: form.heroCaption.trim(),
         order: Number(form.order) || 0,
         active: !!form.active,
       }
@@ -293,6 +324,64 @@ export default function InSitu() {
                 </button>
               )}
               <span className="img-hint">The room photo paired with the piece. Landscape or portrait both work.</span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Hero image (optional)</label>
+              {isImageSrc(form.heroImage) && (
+                <div style={{ marginBottom: 8 }}>
+                  <img
+                    src={form.heroImage}
+                    alt=""
+                    style={{ maxWidth: 320, height: 'auto', borderRadius: 6, border: '1px solid #e5e5ea' }}
+                  />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={onHeroFile}
+                disabled={uploading}
+              />
+              {uploading && <span className="img-hint">Processing…</span>}
+              {form.heroImage && (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ marginTop: 6, fontSize: 12 }}
+                  onClick={() => setForm((f) => ({ ...f, heroImage: '' }))}
+                >
+                  Remove hero image
+                </button>
+              )}
+              <span className="img-hint">
+                The clean product shot shown on the LEFT (hero) tile. Leave blank
+                to use the linked piece&apos;s own main image.
+              </span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Hero title (optional)</label>
+              <input
+                value={form.heroTitle}
+                onChange={(e) => setForm((f) => ({ ...f, heroTitle: e.target.value }))}
+                placeholder="e.g. Sculpture — L'Inconnu"
+              />
+              <span className="img-hint">
+                Overrides the big label shown under the hero image. Leave blank
+                to use the piece label above.
+              </span>
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Hero caption (optional)</label>
+              <textarea
+                value={form.heroCaption}
+                onChange={(e) => setForm((f) => ({ ...f, heroCaption: e.target.value }))}
+                placeholder="A short sentence displayed below the hero title."
+                rows={2}
+              />
+              <span className="img-hint">Shown below the hero title. Leave blank to hide.</span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }}>

@@ -68,6 +68,7 @@ export const inSitu           = slugResource('/api/in-situ')
 export const materials        = slugResource('/api/materials')
 export const craftPrinciples  = slugResource('/api/craft-principles')
 export const ownershipPillars = slugResource('/api/ownership-pillars')
+export const luxeExclusive    = slugResource('/api/luxe-exclusive')
 
 // -------- Orders (backend) --------
 

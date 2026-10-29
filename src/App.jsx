@@ -14,6 +14,7 @@ import EditTags from './pages/EditTags'
 import Journal from './pages/Journal'
 import Banners from './pages/Banners'
 import InSitu from './pages/InSitu'
+import LuxeExclusive from './pages/LuxeExclusive'
 import HouseContent from './pages/HouseContent'
 import Enquiry from './pages/Enquiry'
 import Settings from './pages/Settings'
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="/journal" element={<Journal />} />
         <Route path="/banners" element={<Banners />} />
         <Route path="/in-situ" element={<InSitu />} />
+        <Route path="/luxe-exclusive" element={<LuxeExclusive />} />
         <Route path="/house" element={<HouseContent />} />
         <Route path="/enquiry" element={<Enquiry />} />
         <Route path="/settings" element={<Settings />} />

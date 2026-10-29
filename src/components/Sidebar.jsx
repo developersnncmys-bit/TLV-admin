@@ -5,7 +5,7 @@ import { orders as ordersApi } from '../api/client'
 import {
   IconDashboard, IconBox, IconTag, IconLayers, IconBook, IconImage,
   IconMapPin, IconBuilding, IconPhone, IconSettings, IconOrders, IconInventory,
-  IconUsers, IconCard, IconChart,
+  IconUsers, IconCard, IconChart, IconStar,
 } from './icons'
 
 const NAV = [
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/journal',    label: 'Journal',          Icon: IconBook },
   { to: '/banners',    label: 'Banners',          Icon: IconImage },
   { to: '/in-situ',    label: 'In-Situ',          Icon: IconMapPin },
+  { to: '/luxe-exclusive', label: 'Luxe Exclusive', Icon: IconStar },
   { to: '/house',      label: 'The House',        Icon: IconBuilding },
   { to: '/enquiry',    label: 'Enquiry',          Icon: IconPhone },
   { to: '/settings',   label: 'Settings',         Icon: IconSettings },

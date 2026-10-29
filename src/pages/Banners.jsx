@@ -48,12 +48,13 @@ const TYPE_BADGE_BG = {
 }
 
 const PAGE_OPTIONS = [
-  { value: 'home',       label: 'Home' },
-  { value: 'collection', label: 'The Collection' },
-  { value: 'edit',       label: 'The Edit' },
-  { value: 'house',      label: 'The House' },
-  { value: 'studio',     label: 'The Studio' },
-  { value: 'product',    label: 'Product detail (all pieces)' },
+  { value: 'home',        label: 'Home' },
+  { value: 'collection',  label: 'The Collection' },
+  { value: 'edit',        label: 'The Edit' },
+  { value: 'house',       label: 'The House' },
+  { value: 'studio',      label: 'The Studio' },
+  { value: 'appointment', label: 'Book an Appointment' },
+  { value: 'product',     label: 'Product detail (all pieces)' },
 ]
 
 export default function Banners() {
@@ -165,7 +166,11 @@ export default function Banners() {
       const hasEyebrow = t === 'parallax' || t === 'editorial' || t === 'cta_band'
       const hasBody = t === 'editorial' || t === 'cta_band'
       const hasSubtitle = t === 'hero' || t === 'parallax'
-      const hasAttribution = t === 'hero'
+      // Hero banners get an attribution caption on the storefront (bottom-left
+// corner). Feature banners (parallax) also need it so the House page's
+// "art of objects" closing image can carry its "OBJET · SILLON — CAST
+// BRONZE" style credit.
+const hasAttribution = t === 'hero' || t === 'parallax'
       const hasCta = t === 'hero' || t === 'parallax' || t === 'cta_band'
       const hasImage = t !== 'cta_band'
       const payload = {
@@ -234,7 +239,11 @@ export default function Banners() {
   const isEditorial = form.type === 'editorial'
   const isCtaBand = form.type === 'cta_band'
   const isHero = form.type === 'hero'
-  const hasPage = isHero || isEditorial || isCtaBand
+  // Feature banners (parallax) also need a Page selector so section-targeted
+  // banners (e.g. house/art, house/film) resolve on the right page. Without
+  // this the page silently defaults to 'home' and the storefront's
+  // page-scoped lookup can't find the banner.
+  const hasPage = isHero || isEditorial || isCtaBand || isParallax
   const hasEyebrow = isParallax || isEditorial || isCtaBand
   const hasImage = !isCtaBand
   const canMedia = isHero || isParallax || isEditorial

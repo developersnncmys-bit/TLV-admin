@@ -18,6 +18,9 @@ const EMPTY = {
   region: '',
   author: 'The Luxe Version',
   hero: '',
+  // Additional angles gallery — rendered as the "N OTHER ANGLES" thumbnail
+  // grid on the storefront's Studio page. Stored as an array of URLs.
+  images: [],
   pull_quote: '',
   body: '',
   order: 0,
@@ -46,6 +49,7 @@ export default function Journal() {
       region: s.region || '',
       author: s.author || 'The Luxe Version',
       hero: s.hero || '',
+      images: Array.isArray(s.images) ? s.images.filter(Boolean) : [],
       pull_quote: s.pull_quote || '',
       body: s.body || '',
       order: Number(s.order) || 0,
@@ -69,6 +73,35 @@ export default function Journal() {
     }
   }
 
+  // Multi-file upload for the "other angles" gallery. Uploads sequentially
+  // and appends each returned URL to the images array.
+  async function onAnglesFiles(e) {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    setUploading(true)
+    try {
+      const uploaded = []
+      for (const file of files) {
+        const url = await uploadImage(file)
+        uploaded.push(url)
+      }
+      setForm((f) => ({ ...f, images: [...(f.images || []), ...uploaded] }))
+      toast.ok(`${uploaded.length} image${uploaded.length > 1 ? 's' : ''} added`)
+    } catch (err) {
+      toast.bad(err.message || 'Upload failed')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  function removeAngle(idx) {
+    setForm((f) => ({
+      ...f,
+      images: (f.images || []).filter((_, i) => i !== idx),
+    }))
+  }
+
   async function save(e) {
     e.preventDefault()
     if (!form.name.trim()) return toast.bad('Entry title is required')
@@ -81,6 +114,7 @@ export default function Journal() {
         region: form.region.trim(),
         author: form.author.trim(),
         hero: form.hero,
+        images: Array.isArray(form.images) ? form.images.filter(Boolean) : [],
         pull_quote: form.pull_quote.trim(),
         body: form.body.trim(),
         order: Number(form.order) || 0,
@@ -265,6 +299,70 @@ export default function Journal() {
                   Remove image
                 </button>
               )}
+            </div>
+
+            <div className="field full" style={{ marginBottom: 14 }}>
+              <label>Other angles (gallery)</label>
+              {Array.isArray(form.images) && form.images.length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))',
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  {form.images.map((src, i) => (
+                    <div key={`${src}-${i}`} style={{ position: 'relative' }}>
+                      <img
+                        src={src}
+                        alt=""
+                        style={{
+                          width: '100%',
+                          height: 96,
+                          objectFit: 'cover',
+                          borderRadius: 6,
+                          border: '1px solid #e5e5ea',
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeAngle(i)}
+                        title="Remove"
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          background: 'rgba(0,0,0,0.65)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 999,
+                          width: 22,
+                          height: 22,
+                          cursor: 'pointer',
+                          fontSize: 14,
+                          lineHeight: 1,
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={onAnglesFiles}
+                disabled={uploading}
+              />
+              {uploading && <span className="img-hint">Processing…</span>}
+              <span className="img-hint">
+                Additional thumbnails shown in the &quot;N OTHER ANGLES&quot; grid
+                on the storefront&apos;s Studio page. Select multiple files at once;
+                the hero image above remains the main shot.
+              </span>
             </div>
 
             <div className="field full" style={{ marginBottom: 14 }}>

@@ -3,19 +3,17 @@ import {
   houseContent as hcApi,
   materials as matApi,
   craftPrinciples as cpApi,
-  ownershipPillars as opApi,
 } from '../api/client'
 import { uploadImage, isImageSrc } from '../lib/image'
 import { useToast } from '../context/ToastContext'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { IconBuilding, IconLayers, IconBook, IconShield, IconPlus, IconPencil, IconTrash } from '../components/icons'
+import { IconBuilding, IconLayers, IconBook, IconPlus, IconPencil, IconTrash } from '../components/icons'
 
 const NAV = [
   { k: 'materials', label: 'Materials', Icon: IconBuilding },
   { k: 'craft',     label: 'Craft',     Icon: IconLayers },
   { k: 'story',     label: 'Story',     Icon: IconBook },
-  { k: 'ownership', label: 'Ownership', Icon: IconShield },
 ]
 
 const EMPTY_HOUSE = {
@@ -31,7 +29,6 @@ const EMPTY_HOUSE = {
 
 const EMPTY_MATERIAL  = { id: '', name: '', description: '', image: '', order: 0 }
 const EMPTY_PRINCIPLE = { id: '', title: '', body: '', order: 0 }
-const EMPTY_PILLAR    = { id: '', title: '', body: '', ctaLabel: '', ctaHref: '', order: 0 }
 
 export default function HouseContent() {
   const toast = useToast()
@@ -39,7 +36,6 @@ export default function HouseContent() {
   const [house, setHouse] = useState(EMPTY_HOUSE)
   const [materials, setMaterials] = useState([])
   const [principles, setPrinciples] = useState([])
-  const [pillars, setPillars] = useState([])
   const [uploadingCraft, setUploadingCraft] = useState(false)
 
   // Material modal state
@@ -55,19 +51,12 @@ export default function HouseContent() {
   const [prSaving, setPrSaving] = useState(false)
   const [prConfirm, setPrConfirm] = useState(null)
 
-  // Pillar modal state
-  const [opForm, setOpForm] = useState(EMPTY_PILLAR)
-  const [opEditing, setOpEditing] = useState(null)
-  const [opSaving, setOpSaving] = useState(false)
-  const [opConfirm, setOpConfirm] = useState(null)
-
   async function loadAll() {
     try {
-      const [h, m, p, o] = await Promise.all([hcApi.get(), matApi.list(), cpApi.list(), opApi.list()])
+      const [h, m, p] = await Promise.all([hcApi.get(), matApi.list(), cpApi.list()])
       setHouse({ ...EMPTY_HOUSE, ...h })
       setMaterials((m || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0)))
       setPrinciples((p || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0)))
-      setPillars((o || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0)))
     } catch (e) {
       toast.bad(e.message || 'Could not load house content')
     }
@@ -222,65 +211,8 @@ export default function HouseContent() {
     }
   }
 
-  // -------- Ownership pillar handlers --------
-  function openNewPillar() { setOpForm(EMPTY_PILLAR); setOpEditing({}) }
-  function openEditPillar(p) {
-    setOpForm({
-      id: p.id || '',
-      title: p.title || '',
-      body: p.body || '',
-      ctaLabel: p.ctaLabel || '',
-      ctaHref: p.ctaHref || '',
-      order: Number(p.order) || 0,
-    })
-    setOpEditing(p)
-  }
-
-  async function savePillar(e) {
-    e.preventDefault()
-    if (!opForm.title.trim()) return toast.bad('Pillar title is required')
-    setOpSaving(true)
-    try {
-      const payload = {
-        title: opForm.title.trim(),
-        body: opForm.body.trim(),
-        ctaLabel: opForm.ctaLabel.trim(),
-        ctaHref: opForm.ctaHref.trim(),
-        order: Number(opForm.order) || 0,
-      }
-      if (opEditing.id) {
-        await opApi.update(opEditing.id, payload)
-        toast.ok('Pillar updated')
-      } else {
-        await opApi.create({ ...payload, id: opForm.id.trim() || undefined })
-        toast.ok('Pillar added')
-      }
-      setOpEditing(null)
-      loadAll()
-    } catch (e) {
-      toast.bad(e.message)
-    } finally {
-      setOpSaving(false)
-    }
-  }
-
-  async function doDeletePillar() {
-    setOpSaving(true)
-    try {
-      await opApi.remove(opConfirm.id)
-      toast.ok('Pillar deleted')
-      setOpConfirm(null)
-      loadAll()
-    } catch (e) {
-      toast.bad(e.message)
-    } finally {
-      setOpSaving(false)
-    }
-  }
-
   // -------- Render --------
-  const headerSaveable = tab === 'materials' || tab === 'craft' || tab === 'story'
-  const headerShowSave = headerSaveable && tab !== 'ownership'
+  const headerShowSave = tab === 'materials' || tab === 'craft' || tab === 'story'
 
   return (
     <>
@@ -292,9 +224,6 @@ export default function HouseContent() {
         <div className="page-actions">
           {headerShowSave && (
             <button className="btn btn-primary" onClick={saveHeader}>Save Changes</button>
-          )}
-          {tab === 'ownership' && (
-            <button className="btn btn-primary" onClick={openNewPillar}><IconPlus size={16} /> New pillar</button>
           )}
         </div>
       </div>
@@ -469,50 +398,6 @@ export default function HouseContent() {
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="icon-btn" title="Edit" onClick={() => openEditPrinciple(p)}><IconPencil size={15} /></button>
                         <button className="icon-btn danger" title="Delete" onClick={() => setPrConfirm(p)}><IconTrash size={15} /></button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {tab === 'ownership' && (
-            <>
-              <h3 className="panel-title">Ownership Pillars</h3>
-              <p className="img-hint" style={{ marginTop: -8, marginBottom: 18 }}>
-                The "OWNERSHIP ACCORDING TO THE HOUSE" band shown at the bottom of every product detail page.
-                Three pillars display best; add or remove to match your copy.
-              </p>
-
-              {pillars.length === 0 ? (
-                <div className="empty"><div className="em-ico">🛡</div><p>No pillars yet</p></div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {pillars.map((p) => (
-                    <div key={p.id} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 14,
-                      padding: 14, borderRadius: 10,
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      background: 'rgba(255,255,255,0.03)',
-                    }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--glass-text)', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                          {p.title} <span style={{ fontSize: 11, color: 'var(--glass-text-muted)', fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>· order {p.order || 0}</span>
-                        </div>
-                        <div style={{ fontSize: 13, color: 'var(--glass-text-soft)', marginTop: 5, lineHeight: 1.5 }}>
-                          {p.body}
-                        </div>
-                        {(p.ctaLabel || p.ctaHref) && (
-                          <div style={{ fontSize: 11.5, color: 'var(--glass-text-muted)', marginTop: 6, letterSpacing: 0.3 }}>
-                            CTA: <span style={{ color: 'var(--glass-text-soft)' }}>{p.ctaLabel || '—'}</span>
-                            {p.ctaHref ? <span> → {p.ctaHref}</span> : null}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="icon-btn" title="Edit" onClick={() => openEditPillar(p)}><IconPencil size={15} /></button>
-                        <button className="icon-btn danger" title="Delete" onClick={() => setOpConfirm(p)}><IconTrash size={15} /></button>
                       </div>
                     </div>
                   ))}
@@ -714,91 +599,6 @@ export default function HouseContent() {
         />
       )}
 
-      {opEditing && (
-        <Modal
-          title={opEditing.id ? 'Edit Pillar' : 'New Pillar'}
-          subtitle={opEditing.id ? opEditing.id : 'A column in the OWNERSHIP band on product pages'}
-          onClose={() => setOpEditing(null)}
-          footer={
-            <>
-              <button className="btn btn-outline" onClick={() => setOpEditing(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={savePillar} disabled={opSaving}>
-                {opSaving ? 'Saving…' : opEditing.id ? 'Save changes' : 'Create'}
-              </button>
-            </>
-          }
-        >
-          <form onSubmit={savePillar}>
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Title *</label>
-              <input
-                value={opForm.title}
-                onChange={(e) => setOpForm((f) => ({ ...f, title: e.target.value }))}
-                placeholder="e.g. Provenance"
-                autoFocus
-              />
-            </div>
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Body</label>
-              <textarea
-                value={opForm.body}
-                onChange={(e) => setOpForm((f) => ({ ...f, body: e.target.value }))}
-                rows={4}
-                placeholder="Every piece is signed, dated and accompanied by a hand-numbered certificate…"
-              />
-            </div>
-            <div className="form-grid" style={{ marginBottom: 14 }}>
-              <div className="field">
-                <label>CTA label</label>
-                <input
-                  value={opForm.ctaLabel}
-                  onChange={(e) => setOpForm((f) => ({ ...f, ctaLabel: e.target.value }))}
-                  placeholder="Learn more"
-                />
-              </div>
-              <div className="field">
-                <label>CTA link</label>
-                <input
-                  value={opForm.ctaHref}
-                  onChange={(e) => setOpForm((f) => ({ ...f, ctaHref: e.target.value }))}
-                  placeholder="/the-house#provenance"
-                />
-              </div>
-            </div>
-            <div className="field full" style={{ marginBottom: 14 }}>
-              <label>Display order</label>
-              <input
-                type="number"
-                value={opForm.order}
-                onChange={(e) => setOpForm((f) => ({ ...f, order: e.target.value }))}
-                placeholder="0"
-              />
-              <span className="img-hint">Lower numbers appear first.</span>
-            </div>
-            {!opEditing.id && (
-              <div className="field full">
-                <label>Slug id (optional)</label>
-                <input
-                  value={opForm.id}
-                  onChange={(e) => setOpForm((f) => ({ ...f, id: e.target.value }))}
-                  placeholder="Auto-derived if left blank"
-                />
-                <span className="img-hint">Cannot be changed after creation.</span>
-              </div>
-            )}
-          </form>
-        </Modal>
-      )}
-
-      {opConfirm && (
-        <ConfirmDialog
-          title="Delete pillar"
-          message={`Delete "${opConfirm.title}"? Removed from the OWNERSHIP band on next page load.`}
-          onConfirm={doDeletePillar}
-          onClose={() => setOpConfirm(null)}
-          busy={opSaving}
-        />
-      )}
     </>
   )
 }
